@@ -1,0 +1,6 @@
+[submodule "sensorimotor_norms"]
+	path = sensorimotor_norms
+	url = git@github.com:emcoglab/sensorimotor-norms.git
+[submodule "linguistic_distributional_models"]
+	path = linguistic_distributional_models
+	url = git@github.com:emcoglab/ldm-core.git
