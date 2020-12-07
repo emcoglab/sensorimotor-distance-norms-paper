@@ -1,0 +1,3 @@
+-r linguistic_distributional_models/requirements.txt
+-r sensorimotor_norms/requirements.txt
+pandas
