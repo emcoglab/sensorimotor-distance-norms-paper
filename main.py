@@ -84,8 +84,8 @@ def add_ancillary_predictors(dataset: DataFrame):
             "Word 2 length": len(word_2),
             "Word 1 frequency": fd[word_1],
             "Word 2 frequency": fd[word_2],
-            "Log Word 1 frequency": log(fd[word_1]),
-            "Log Word 2 frequency": log(fd[word_2]),
+            "Log Word 1 frequency": log(fd[word_1] + 1),
+            "Log Word 2 frequency": log(fd[word_2] + 1),
         })
 
     dataset[[
