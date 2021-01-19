@@ -78,6 +78,17 @@ def add_sensorimotor_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str
     dataset["Sensorimotor distance"] = dataset.apply(calc_sensorimotor_distance, axis=1)
 
 
+def load_nelson_data():
+    with Path(Path(__file__).parent, "data", "Nelson_AppendixB.csv").open() as nelson_file:
+        nelson = read_csv(nelson_file, skip_blank_lines=True, header=0)
+    nelson["Targets"] = nelson["Targets"].str.lower()
+    nelson["Part of Speech"] = nelson["Part of Speech"].str.lower()
+    return nelson
+
+
+nelson = load_nelson_data()
+
+
 def add_jcn_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str], pos: str):
     key_col_1, key_col_2 = word_key_cols
 
@@ -90,9 +101,25 @@ def add_jcn_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str], pos: s
         nonlocal i
         i += 1
         print_progress(i, n, prefix="Adding Jiang–Coranth predictor: ")
+
+        # Get words
+        w1 = row[key_col_1]
+        w2 = row[key_col_2]
+
+        # Get POS
+        if pos != "nelson":
+            pos_1 = pos_2 = pos
+        else:
+            try:
+                pos_1 = nelson[nelson["Targets"] == w1]["Part of Speech"].iloc[0]
+                pos_2 = nelson[nelson["Targets"] == w2]["Part of Speech"].iloc[0]
+            except IndexError:
+                return None
+
+        # Get JCN
         try:
-            synset1 = wordnet.synset(f"{row[key_col_1]}.{pos}.01")
-            synset2 = wordnet.synset(f"{row[key_col_2]}.{pos}.01")
+            synset1 = wordnet.synset(f"{w1}.{pos_1}.01")
+            synset2 = wordnet.synset(f"{w2}.{pos_2}.01")
             jcn = 1 / synset1.jcn_similarity(synset2, brown_ic)  # To match the fomula used by Maki et al. (2004)
             if jcn >= 1_000:
                 return None
@@ -122,7 +149,7 @@ def main():
     add_extra_predictors(data_rel, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="n")
     add_extra_predictors(data_rg, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="n")
     add_extra_predictors(data_mc, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="n")
-    add_extra_predictors(data_jcn, ("CUE", "TARGET"))
+    add_extra_predictors(data_jcn, ("CUE", "TARGET"), pos="nelson")
 
     # Save
     with open(Path(out_dir, "wordsim.csv"), mode="w", encoding="utf-8") as out_file:
