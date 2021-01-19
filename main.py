@@ -1,6 +1,8 @@
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Optional
 
+from nltk.corpus import wordnet_ic, wordnet
+from nltk.corpus.reader import WordNetError
 from pandas import DataFrame, read_csv
 
 from linguistic_distributional_models.evaluation.association import MenSimilarity, WordsimAll, \
@@ -49,12 +51,18 @@ def load_jcn_data() -> DataFrame:
     return jcn_data
 
 
-def add_sensorimotor_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str], use_breng_translation: bool = False):
-    sn = SensorimotorNorms(use_breng_translation=use_breng_translation)
+def add_extra_predictors(dataset: DataFrame, word_key_cols: Tuple[str, str], pos: Optional[str] = None):
+    add_sensorimotor_predictor(dataset, word_key_cols)
+    if pos is not None:
+        add_jcn_predictor(dataset, word_key_cols, pos)
+
+
+def add_sensorimotor_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str]):
+    key_col_1, key_col_2 = word_key_cols
+    sn = SensorimotorNorms()
+
     i = 0
     n = dataset.shape[0]
-
-    key_col_1, key_col_2 = word_key_cols
 
     def calc_sensorimotor_distance(row):
         nonlocal i
@@ -70,30 +78,53 @@ def add_sensorimotor_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str
     dataset["Sensorimotor distance"] = dataset.apply(calc_sensorimotor_distance, axis=1)
 
 
+def add_jcn_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str], pos: str):
+    key_col_1, key_col_2 = word_key_cols
+
+    brown_ic = wordnet_ic.ic('ic-brown.dat')
+
+    i = 0
+    n = dataset.shape[0]
+
+    def calc_jcn_distance(row):
+        nonlocal i
+        i += 1
+        print_progress(i, n, prefix="Adding Jiang–Coranth predictor: ")
+        try:
+            synset1 = wordnet.synset(f"{row[key_col_1]}.{pos}.01")
+            synset2 = wordnet.synset(f"{row[key_col_2]}.{pos}.01")
+            jcn = 1 / synset1.jcn_similarity(synset2, brown_ic)  # To match the fomula used by Maki et al. (2004)
+            if jcn >= 1_000:
+                return None
+            return jcn
+        except WordNetError:
+            return None
+
+    dataset["JCN distance"] = dataset.apply(calc_jcn_distance, axis=1)
+
+
 def main():
     out_dir = Path("/Users/caiwingfield/Desktop/")
 
     # Load data
-    data_jcn: DataFrame = load_jcn_data()
     data_wordsim: DataFrame = load_wordsim_data()
     data_simlex: DataFrame = load_simlex_data()
     data_men: DataFrame = load_simlex_data()
     data_rel: DataFrame = load_rel_data()
     data_rg: DataFrame = load_rg65_data()
     data_mc: DataFrame = load_miller_charles_data()
+    data_jcn: DataFrame = load_jcn_data()
 
     # Add sensorimotor predictors
-    add_sensorimotor_predictor(data_jcn, ("CUE", "TARGET"))
-    add_sensorimotor_predictor(data_wordsim, (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2))
-    add_sensorimotor_predictor(data_simlex, (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2))
-    add_sensorimotor_predictor(data_men, (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2))
-    add_sensorimotor_predictor(data_rel, (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2))
-    add_sensorimotor_predictor(data_rg, (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2))
-    add_sensorimotor_predictor(data_mc, (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2))
+    add_extra_predictors(data_wordsim, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2))
+    add_extra_predictors(data_simlex, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2))
+    add_extra_predictors(data_men, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2))
+    add_extra_predictors(data_rel, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="n")
+    add_extra_predictors(data_rg, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="n")
+    add_extra_predictors(data_mc, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="n")
+    add_extra_predictors(data_jcn, ("CUE", "TARGET"))
 
     # Save
-    with open(Path(out_dir, "jcn.csv"), mode="w", encoding="utf-8") as out_file:
-        data_jcn.to_csv(out_file, header=True, index=False)
     with open(Path(out_dir, "wordsim.csv"), mode="w", encoding="utf-8") as out_file:
         data_wordsim.to_csv(out_file, header=True, index=False)
     with open(Path(out_dir, "simlex.csv"), mode="w", encoding="utf-8") as out_file:
@@ -106,6 +137,8 @@ def main():
         data_rg.to_csv(out_file, header=True, index=False)
     with open(Path(out_dir, "miller_charles.csv"), mode="w", encoding="utf-8") as out_file:
         data_mc.to_csv(out_file, header=True, index=False)
+    with open(Path(out_dir, "jcn.csv"), mode="w", encoding="utf-8") as out_file:
+        data_jcn.to_csv(out_file, header=True, index=False)
 
 
 if __name__ == '__main__':
