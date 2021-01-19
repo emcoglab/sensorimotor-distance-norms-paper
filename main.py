@@ -1,63 +1,68 @@
 from pathlib import Path
+from typing import Tuple
 
-from numpy import log
-from pandas import DataFrame, Series
+from pandas import DataFrame, read_csv
 
-from linguistic_distributional_models.corpus.indexing import FreqDist
-from linguistic_distributional_models.preferences.preferences import Preferences as LDMPreferences
-from linguistic_distributional_models.evaluation.association import WordAssociationTest, MenSimilarity
-from linguistic_distributional_models.model.predict import CbowModel
-from linguistic_distributional_models.utils.exceptions import WordNotFoundError
+from linguistic_distributional_models.evaluation.association import MenSimilarity, WordsimAll, \
+    SimlexSimilarity, WordAssociationTest, RelRelatedness, RubensteinGoodenough, MillerCharlesSimilarity
 from linguistic_distributional_models.utils.logging import print_progress
 from linguistic_distributional_models.utils.maths import DistanceType, distance
 from sensorimotor_norms.exceptions import WordNotInNormsError
 from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
 
 
-corpus = LDMPreferences.source_corpus_metas.ukwac
+def load_men_data() -> DataFrame:
+    men_associations: DataFrame = MenSimilarity().associations_to_dataframe()
+    return men_associations
 
 
-def load_dataset() -> DataFrame:
-    wordsim_associations: DataFrame = MenSimilarity().associations_to_dataframe()
+def load_wordsim_data() -> DataFrame:
+    wordsim_associations: DataFrame = WordsimAll().associations_to_dataframe()
     return wordsim_associations
 
 
-def add_linguistic_predictor(dataset: DataFrame):
-    distance_measure = DistanceType.cosine
-    model = CbowModel(corpus_meta=corpus,
-                      window_radius=10,
-                      embedding_size=200)
-    model.train(memory_map=True)
+def load_simlex_data() -> DataFrame:
+    wordsim_associations: DataFrame = SimlexSimilarity().associations_to_dataframe()
+    return wordsim_associations
+
+
+def load_rel_data() -> DataFrame:
+    wordsim_associations: DataFrame = RelRelatedness().associations_to_dataframe()
+    return wordsim_associations
+
+
+def load_rg65_data() -> DataFrame:
+    rg_associations: DataFrame = RubensteinGoodenough().associations_to_dataframe()
+    return rg_associations
+
+
+def load_miller_charles_data() -> DataFrame:
+    mc_similarity: DataFrame = MillerCharlesSimilarity().associations_to_dataframe()
+    return mc_similarity
+
+
+def load_jcn_data() -> DataFrame:
+    jcn_path = Path(Path(__file__).parent, "data", "Maki-BRMIC-2004", "usfjcnlsa.csv")
+    with open(jcn_path) as jcn_file:
+        jcn_data: DataFrame = read_csv(jcn_file)
+    jcn_data.rename(columns={"#CUE": "CUE"}, inplace=True)
+    return jcn_data
+
+
+def add_sensorimotor_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str], use_breng_translation: bool = False):
+    sn = SensorimotorNorms(use_breng_translation=use_breng_translation)
     i = 0
     n = dataset.shape[0]
 
-    def calc_linguistic_distance(row):
-        nonlocal i
-        i += 1
-        print_progress(i, n, prefix="Adding linguistic predictor: ")
-        try:
-            return model.distance_between(
-                row[WordAssociationTest.TestColumn.word_1],
-                row[WordAssociationTest.TestColumn.word_2],
-                distance_type=distance_measure)
-        except WordNotFoundError:
-            return None
-
-    dataset["Linguistic distance"] = dataset.apply(calc_linguistic_distance, axis=1)
-
-
-def add_sensorimotor_predictor(dataset: DataFrame):
-    sn = SensorimotorNorms()
-    i = 0
-    n = dataset.shape[0]
+    key_col_1, key_col_2 = word_key_cols
 
     def calc_sensorimotor_distance(row):
         nonlocal i
         i += 1
         print_progress(i, n, prefix="Adding sensorimotor predictor: ")
         try:
-            v1 = sn.vector_for_word(row[WordAssociationTest.TestColumn.word_1])
-            v2 = sn.vector_for_word(row[WordAssociationTest.TestColumn.word_2])
+            v1 = sn.vector_for_word(row[key_col_1])
+            v2 = sn.vector_for_word(row[key_col_2])
             return distance(v1, v2, distance_type=DistanceType.cosine)
         except WordNotInNormsError:
             return None
@@ -65,49 +70,42 @@ def add_sensorimotor_predictor(dataset: DataFrame):
     dataset["Sensorimotor distance"] = dataset.apply(calc_sensorimotor_distance, axis=1)
 
 
-def add_ancillary_predictors(dataset: DataFrame):
-    fd = FreqDist.load(corpus.freq_dist_path)
-
-    i = 0
-    n = dataset.shape[0]
-
-    def calc_ancillary_predictors(row):
-        nonlocal i
-        i += 1
-        print_progress(i, n, prefix="Adding ancillary predictors: ")
-
-        word_1 = row[WordAssociationTest.TestColumn.word_1]
-        word_2 = row[WordAssociationTest.TestColumn.word_2]
-
-        return Series({
-            "Word 1 length": len(word_1),
-            "Word 2 length": len(word_2),
-            "Word 1 frequency": fd[word_1],
-            "Word 2 frequency": fd[word_2],
-            "Log Word 1 frequency": log(fd[word_1] + 1),
-            "Log Word 2 frequency": log(fd[word_2] + 1),
-        })
-
-    dataset[[
-        "Word 1 length",
-        "Word 2 length",
-        "Word 1 frequency",
-        "Word 2 frequency",
-        "Log Word 1 frequency",
-        "Log Word 2 frequency",
-    ]] = dataset.apply(calc_ancillary_predictors, axis=1)
-
-
-
 def main():
-    out_path = Path("/Users/caiwingfield/Desktop/test.csv")
+    out_dir = Path("/Users/caiwingfield/Desktop/")
 
-    dataset: DataFrame = load_dataset()
-    add_ancillary_predictors(dataset)
-    add_linguistic_predictor(dataset)
-    add_sensorimotor_predictor(dataset)
-    with open(out_path, mode="w", encoding="utf-8") as out_file:
-        dataset.to_csv(out_file, header=True, index=False)
+    # Load data
+    data_jcn: DataFrame = load_jcn_data()
+    data_wordsim: DataFrame = load_wordsim_data()
+    data_simlex: DataFrame = load_simlex_data()
+    data_men: DataFrame = load_simlex_data()
+    data_rel: DataFrame = load_rel_data()
+    data_rg: DataFrame = load_rg65_data()
+    data_mc: DataFrame = load_miller_charles_data()
+
+    # Add sensorimotor predictors
+    add_sensorimotor_predictor(data_jcn, ("CUE", "TARGET"))
+    add_sensorimotor_predictor(data_wordsim, (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2))
+    add_sensorimotor_predictor(data_simlex, (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2))
+    add_sensorimotor_predictor(data_men, (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2))
+    add_sensorimotor_predictor(data_rel, (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2))
+    add_sensorimotor_predictor(data_rg, (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2))
+    add_sensorimotor_predictor(data_mc, (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2))
+
+    # Save
+    with open(Path(out_dir, "jcn.csv"), mode="w", encoding="utf-8") as out_file:
+        data_jcn.to_csv(out_file, header=True, index=False)
+    with open(Path(out_dir, "wordsim.csv"), mode="w", encoding="utf-8") as out_file:
+        data_wordsim.to_csv(out_file, header=True, index=False)
+    with open(Path(out_dir, "simlex.csv"), mode="w", encoding="utf-8") as out_file:
+        data_simlex.to_csv(out_file, header=True, index=False)
+    with open(Path(out_dir, "men.csv"), mode="w", encoding="utf-8") as out_file:
+        data_men.to_csv(out_file, header=True, index=False)
+    with open(Path(out_dir, "rel.csv"), mode="w", encoding="utf-8") as out_file:
+        data_rel.to_csv(out_file, header=True, index=False)
+    with open(Path(out_dir, "rg.csv"), mode="w", encoding="utf-8") as out_file:
+        data_rg.to_csv(out_file, header=True, index=False)
+    with open(Path(out_dir, "miller_charles.csv"), mode="w", encoding="utf-8") as out_file:
+        data_mc.to_csv(out_file, header=True, index=False)
 
 
 if __name__ == '__main__':
