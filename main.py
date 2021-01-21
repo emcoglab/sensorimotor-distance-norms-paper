@@ -2,7 +2,8 @@ from pathlib import Path
 from typing import Tuple, Optional
 
 from nltk.corpus import wordnet_ic, wordnet
-from nltk.corpus.reader import WordNetError
+from nltk.corpus.reader import WordNetError, NOUN, VERB, ADJ, ADV
+from numpy import inf
 from pandas import DataFrame, read_csv
 
 from linguistic_distributional_models.evaluation.association import MenSimilarity, WordsimAll, \
@@ -95,6 +96,25 @@ def load_nelson_data():
 nelson = load_nelson_data()
 
 
+def get_nelson_pos(word: str) -> Optional[str]:
+    nelson_to_wordnet = {
+        "n": NOUN,
+        "v": VERB,
+        "aj": ADJ,
+        "ad": ADV,
+    }
+    try:
+        pos = nelson[nelson["Targets"] == word]["Part of Speech"].iloc[0]
+    except IndexError:
+        # Word not found
+        return None
+    try:
+        return nelson_to_wordnet[pos]
+    except KeyError:
+        # These are the only POSs we support
+        return None
+
+
 def add_jcn_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str], pos: str):
     key_col_1, key_col_2 = word_key_cols
 
@@ -113,25 +133,33 @@ def add_jcn_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str], pos: s
         w2 = row[key_col_2]
 
         # Get POS
-        if pos != "nelson":
-            pos_1 = pos_2 = pos
-        else:
-            try:
-                pos_1 = nelson[nelson["Targets"] == w1]["Part of Speech"].iloc[0]
-                pos_2 = nelson[nelson["Targets"] == w2]["Part of Speech"].iloc[0]
-            except IndexError:
+        if pos.lower() == "nelson":
+            pos_1 = get_nelson_pos(w1)
+            pos_2 = get_nelson_pos(w2)
+            if pos_1 != pos_2:
+                # Can only compute distances between word pairs of the same POS
                 return None
+        else:
+            pos_1 = pos_2 = pos
 
         # Get JCN
         try:
-            synset1 = wordnet.synset(f"{w1}.{pos_1}.01")
-            synset2 = wordnet.synset(f"{w2}.{pos_2}.01")
-            jcn = 1 / synset1.jcn_similarity(synset2, brown_ic)  # To match the fomula used by Maki et al. (2004)
-            if jcn >= 1_000:
-                return None
-            return jcn
+            synsets1 = wordnet.synsets(w1, pos=pos_1)
+            synsets2 = wordnet.synsets(w2, pos=pos_2)
         except WordNetError:
             return None
+        minimum_jcn_distance = inf
+        for synset1 in synsets1:
+            for synset2 in synsets2:
+                try:
+                    jcn = 1 / synset1.jcn_similarity(synset2, brown_ic)  # Match the formula of Maki et al. (2004)
+                    minimum_jcn_distance = min(minimum_jcn_distance, jcn)
+                except WordNetError:
+                    # Skip incomparable pairs
+                    continue
+        if minimum_jcn_distance >= 1_000:
+            return None
+        return minimum_jcn_distance
 
     dataset["JCN distance"] = dataset.apply(calc_jcn_distance, axis=1)
 
