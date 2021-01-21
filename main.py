@@ -7,6 +7,7 @@ from pandas import DataFrame, read_csv
 
 from linguistic_distributional_models.evaluation.association import MenSimilarity, WordsimAll, \
     SimlexSimilarity, WordAssociationTest, RelRelatedness, RubensteinGoodenough, MillerCharlesSimilarity
+from linguistic_distributional_models.evaluation.regression import SppData
 from linguistic_distributional_models.utils.logging import print_progress
 from linguistic_distributional_models.utils.maths import DistanceType, distance
 from sensorimotor_norms.exceptions import WordNotInNormsError
@@ -26,6 +27,11 @@ def load_wordsim_data() -> DataFrame:
 def load_simlex_data() -> DataFrame:
     wordsim_associations: DataFrame = SimlexSimilarity().associations_to_dataframe()
     return wordsim_associations
+
+
+def load_priming_data() -> DataFrame:
+    priming_data: DataFrame = SppData().dataframe
+    return priming_data
 
 
 def load_rel_data() -> DataFrame:
@@ -136,16 +142,18 @@ def main():
     # Load data
     data_wordsim: DataFrame = load_wordsim_data()
     data_simlex: DataFrame = load_simlex_data()
-    data_men: DataFrame = load_simlex_data()
+    data_men: DataFrame = load_men_data()
+    data_priming: DataFrame = load_priming_data()
     data_rel: DataFrame = load_rel_data()
     data_rg: DataFrame = load_rg65_data()
     data_mc: DataFrame = load_miller_charles_data()
     data_jcn: DataFrame = load_jcn_data()
 
     # Add sensorimotor predictors
-    add_extra_predictors(data_wordsim, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2))
-    add_extra_predictors(data_simlex, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2))
-    add_extra_predictors(data_men, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2))
+    add_extra_predictors(data_wordsim, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="nelson")
+    add_extra_predictors(data_simlex, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="nelson")
+    add_extra_predictors(data_men, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="nelson")
+    add_extra_predictors(data_priming, word_key_cols=(SppData.Columns.prime_word, SppData.Columns.target_word), pos="nelson")
     add_extra_predictors(data_rel, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="n")
     add_extra_predictors(data_rg, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="n")
     add_extra_predictors(data_mc, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="n")
@@ -158,6 +166,8 @@ def main():
         data_simlex.to_csv(out_file, header=True, index=False)
     with open(Path(out_dir, "men.csv"), mode="w", encoding="utf-8") as out_file:
         data_men.to_csv(out_file, header=True, index=False)
+    with open(Path(out_dir, "priming.csv"), mode="w", encoding="utf-8") as out_file:
+        data_priming.to_csv(out_file, header=True, index=False)
     with open(Path(out_dir, "rel.csv"), mode="w", encoding="utf-8") as out_file:
         data_rel.to_csv(out_file, header=True, index=False)
     with open(Path(out_dir, "rg.csv"), mode="w", encoding="utf-8") as out_file:
