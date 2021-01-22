@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Tuple, Optional, Callable
 
 from nltk.corpus import wordnet_ic, wordnet
+# noinspection PyProtectedMember
 from nltk.corpus.reader import WordNetError, NOUN, VERB, ADJ, ADV
 from numpy import inf
 from pandas import DataFrame, read_csv
@@ -71,7 +72,7 @@ def add_sensorimotor_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str
     def calc_sensorimotor_distance(row):
         nonlocal i
         i += 1
-        print_progress(i, n, prefix="Adding sensorimotor predictor: ")
+        print_progress(i, n, prefix="Sensorimotor:          ", bar_length=200)
         try:
             v1 = sn.vector_for_word(row[key_col_1])
             v2 = sn.vector_for_word(row[key_col_2])
@@ -79,6 +80,7 @@ def add_sensorimotor_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str
         except WordNotInNormsError:
             return None
 
+    # noinspection PyTypeChecker
     dataset[predictor_name] = dataset.apply(calc_sensorimotor_distance, axis=1)
 
 
@@ -97,7 +99,7 @@ def add_jcn_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str], pos: s
     def calc_jcn_distance(row):
         nonlocal i
         i += 1
-        print_progress(i, n, prefix="Adding Jiang–Coranth predictor: ")
+        print_progress(i, n, prefix="WordNet Jiang–Coranth: ", bar_length=200)
 
         # Get words
         w1 = row[key_col_1]
@@ -135,10 +137,15 @@ def add_jcn_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str], pos: s
             return None
         return minimum_jcn_distance
 
+    # noinspection PyTypeChecker
     dataset[predictor_name] = dataset.apply(calc_jcn_distance, axis=1)
 
 
-def process(out_dir: str, out_file_name: str, load_from_source: Callable[[], DataFrame], word_key_cols: Tuple[str, str], pos: Optional[str]):
+def process(out_dir: str,
+            out_file_name: str,
+            load_from_source: Callable[[], DataFrame],
+            word_key_cols: Tuple[str, str],
+            pos: Optional[str]):
     _logger.info(out_file_name)
 
     data_path = Path(out_dir, out_file_name)
@@ -168,16 +175,16 @@ if __name__ == '__main__':
 
     basicConfig(format='%(asctime)s | %(levelname)s | %(module)s | %(message)s', datefmt="%Y-%m-%d %H:%M:%S", level=INFO)
 
-    out_dir = Path("/Users/caiwingfield/Desktop/")
+    save_dir = Path("/Users/caiwingfield/Desktop/")
 
-    process(out_dir, "rg.csv", lambda: RubensteinGoodenough().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n")
-    process(out_dir, "miller_charles.csv", lambda: MillerCharlesSimilarity().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n")
-    process(out_dir, "rel.csv", lambda: RelRelatedness().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n")
-    process(out_dir, "wordsim.csv", lambda: WordsimAll().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "nelson")
-    process(out_dir, "simlex.csv", lambda: SimlexSimilarity().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "nelson")
-    process(out_dir, "men.csv", lambda: MenSimilarity().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "nelson")
-    process(out_dir, "jcn.csv", lambda: load_jcn_data(), ("CUE", "TARGET"), "nelson")
-    process(out_dir, "swow_r1.csv", lambda: SmallWorldOfWords(responses_type=SmallWorldOfWords.ResponsesType.R1).associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n")
-    process(out_dir, "swow_r123.csv", lambda: SmallWorldOfWords(responses_type=SmallWorldOfWords.ResponsesType.R123).associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n")
+    process(save_dir, "rg.csv", lambda: RubensteinGoodenough().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n")
+    process(save_dir, "miller_charles.csv", lambda: MillerCharlesSimilarity().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n")
+    process(save_dir, "rel.csv", lambda: RelRelatedness().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n")
+    process(save_dir, "wordsim.csv", lambda: WordsimAll().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "nelson")
+    process(save_dir, "simlex.csv", lambda: SimlexSimilarity().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "nelson")
+    process(save_dir, "men.csv", lambda: MenSimilarity().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "nelson")
+    process(save_dir, "jcn.csv", lambda: load_jcn_data(), ("CUE", "TARGET"), "nelson")
+    process(save_dir, "swow_r1.csv", lambda: SmallWorldOfWords(responses_type=SmallWorldOfWords.ResponsesType.R1).associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n")
+    process(save_dir, "swow_r123.csv", lambda: SmallWorldOfWords(responses_type=SmallWorldOfWords.ResponsesType.R123).associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n")
 
     _logger.info("Done!")
