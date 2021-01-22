@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Callable
 
 from nltk.corpus import wordnet_ic, wordnet
 from nltk.corpus.reader import WordNetError, NOUN, VERB, ADJ, ADV
@@ -30,6 +30,9 @@ def add_extra_predictors(dataset: DataFrame, word_key_cols: Tuple[str, str], pos
 
 
 def add_sensorimotor_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str]):
+    predictor_name = "Sensorimotor distance"
+    if predictor_name in dataset.columns:
+        return
     key_col_1, key_col_2 = word_key_cols
     sn = SensorimotorNorms()
 
@@ -47,7 +50,7 @@ def add_sensorimotor_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str
         except WordNotInNormsError:
             return None
 
-    dataset["Sensorimotor distance"] = dataset.apply(calc_sensorimotor_distance, axis=1)
+    dataset[predictor_name] = dataset.apply(calc_sensorimotor_distance, axis=1)
 
 
 def load_nelson_data():
@@ -81,6 +84,9 @@ def get_nelson_pos(word: str) -> Optional[str]:
 
 
 def add_jcn_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str], pos: str):
+    predictor_name = "JCN distance"
+    if predictor_name in dataset.columns:
+        return
     key_col_1, key_col_2 = word_key_cols
 
     brown_ic = wordnet_ic.ic('ic-brown.dat')
@@ -129,54 +135,32 @@ def add_jcn_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str], pos: s
             return None
         return minimum_jcn_distance
 
-    dataset["JCN distance"] = dataset.apply(calc_jcn_distance, axis=1)
+    dataset[predictor_name] = dataset.apply(calc_jcn_distance, axis=1)
 
 
-def main():
-    out_dir = Path("/Users/caiwingfield/Desktop/")
-
-    # Load data
-    data_wordsim: DataFrame = WordsimAll().associations_to_dataframe()
-    data_simlex: DataFrame = SimlexSimilarity().associations_to_dataframe()
-    data_men: DataFrame = MenSimilarity().associations_to_dataframe()
-    data_rel: DataFrame = RelRelatedness().associations_to_dataframe()
-    data_rg: DataFrame = RubensteinGoodenough().associations_to_dataframe()
-    data_mc: DataFrame = MillerCharlesSimilarity().associations_to_dataframe()
-    data_jcn: DataFrame = load_jcn_data()
-    data_swow_r1: DataFrame = SmallWorldOfWords(responses_type=SmallWorldOfWords.ResponsesType.R1).associations_to_dataframe()
-    data_swow_r123: DataFrame = SmallWorldOfWords(responses_type=SmallWorldOfWords.ResponsesType.R123).associations_to_dataframe()
-
-    # Add sensorimotor predictors
-    add_extra_predictors(data_wordsim, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="nelson")
-    add_extra_predictors(data_simlex, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="nelson")
-    add_extra_predictors(data_men, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="nelson")
-    add_extra_predictors(data_rel, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="n")
-    add_extra_predictors(data_rg, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="n")
-    add_extra_predictors(data_mc, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="n")
-    add_extra_predictors(data_jcn, ("CUE", "TARGET"), pos="nelson")
-    add_extra_predictors(data_swow_r1, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="nelson")
-    add_extra_predictors(data_swow_r123, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="nelson")
-
-    # Save
-    with open(Path(out_dir, "wordsim.csv"), mode="w", encoding="utf-8") as out_file:
-        data_wordsim.to_csv(out_file, header=True, index=False)
-    with open(Path(out_dir, "simlex.csv"), mode="w", encoding="utf-8") as out_file:
-        data_simlex.to_csv(out_file, header=True, index=False)
-    with open(Path(out_dir, "men.csv"), mode="w", encoding="utf-8") as out_file:
-        data_men.to_csv(out_file, header=True, index=False)
-    with open(Path(out_dir, "rel.csv"), mode="w", encoding="utf-8") as out_file:
-        data_rel.to_csv(out_file, header=True, index=False)
-    with open(Path(out_dir, "rg.csv"), mode="w", encoding="utf-8") as out_file:
-        data_rg.to_csv(out_file, header=True, index=False)
-    with open(Path(out_dir, "miller_charles.csv"), mode="w", encoding="utf-8") as out_file:
-        data_mc.to_csv(out_file, header=True, index=False)
-    with open(Path(out_dir, "jcn.csv"), mode="w", encoding="utf-8") as out_file:
-        data_jcn.to_csv(out_file, header=True, index=False)
-    with open(Path(out_dir, "swow_r1.csv"), mode="w", encoding="utf-8") as out_file:
-        data_swow_r1.to_csv(out_file, header=True, index=False)
-    with open(Path(out_dir, "swow_r123.csv"), mode="w", encoding="utf-8") as out_file:
-        data_swow_r123.to_csv(out_file, header=True, index=False)
+def process(out_dir: str, out_file_name: str, load_from_source: Callable[[], DataFrame], word_key_cols: Tuple[str, str], pos: Optional[str]):
+    data_path = Path(out_dir, out_file_name)
+    data: DataFrame
+    if not data_path.exists():
+        data = load_from_source()
+    else:
+        with data_path.open(mode="r") as data_file:
+            data = read_csv(data_file, header=0, index_col=None)
+    add_extra_predictors(data, word_key_cols=word_key_cols, pos=pos)
+    with data_path.open(mode="w") as out_file:
+        data.to_csv(out_file, header=True, index=False)
 
 
 if __name__ == '__main__':
-    main()
+
+    out_dir = Path("/Users/caiwingfield/Desktop/")
+
+    process(out_dir, "rg.csv", lambda: RubensteinGoodenough().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n")
+    process(out_dir, "miller_charles.csv", lambda: MillerCharlesSimilarity().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n")
+    process(out_dir, "rel.csv", lambda: RelRelatedness().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n")
+    process(out_dir, "wordsim.csv", lambda: WordsimAll().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "nelson")
+    process(out_dir, "simlex.csv", lambda: SimlexSimilarity().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "nelson")
+    process(out_dir, "men.csv", lambda: MenSimilarity().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "nelson")
+    process(out_dir, "jcn.csv", lambda: load_jcn_data(), ("CUE", "TARGET"), "nelson")
+    process(out_dir, "swow_r1.csv", lambda: SmallWorldOfWords(responses_type=SmallWorldOfWords.ResponsesType.R1).associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n")
+    process(out_dir, "swow_r123.csv", lambda: SmallWorldOfWords(responses_type=SmallWorldOfWords.ResponsesType.R123).associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n")
