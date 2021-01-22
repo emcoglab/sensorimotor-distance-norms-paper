@@ -7,47 +7,12 @@ from numpy import inf
 from pandas import DataFrame, read_csv
 
 from linguistic_distributional_models.evaluation.association import MenSimilarity, WordsimAll, \
-    SimlexSimilarity, WordAssociationTest, RelRelatedness, RubensteinGoodenough, MillerCharlesSimilarity
-from linguistic_distributional_models.evaluation.regression import SppData
+    SimlexSimilarity, WordAssociationTest, RelRelatedness, RubensteinGoodenough, MillerCharlesSimilarity, \
+    SmallWorldOfWords
 from linguistic_distributional_models.utils.logging import print_progress
 from linguistic_distributional_models.utils.maths import DistanceType, distance
 from sensorimotor_norms.exceptions import WordNotInNormsError
 from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
-
-
-def load_men_data() -> DataFrame:
-    men_associations: DataFrame = MenSimilarity().associations_to_dataframe()
-    return men_associations
-
-
-def load_wordsim_data() -> DataFrame:
-    wordsim_associations: DataFrame = WordsimAll().associations_to_dataframe()
-    return wordsim_associations
-
-
-def load_simlex_data() -> DataFrame:
-    wordsim_associations: DataFrame = SimlexSimilarity().associations_to_dataframe()
-    return wordsim_associations
-
-
-def load_priming_data() -> DataFrame:
-    priming_data: DataFrame = SppData().dataframe
-    return priming_data
-
-
-def load_rel_data() -> DataFrame:
-    wordsim_associations: DataFrame = RelRelatedness().associations_to_dataframe()
-    return wordsim_associations
-
-
-def load_rg65_data() -> DataFrame:
-    rg_associations: DataFrame = RubensteinGoodenough().associations_to_dataframe()
-    return rg_associations
-
-
-def load_miller_charles_data() -> DataFrame:
-    mc_similarity: DataFrame = MillerCharlesSimilarity().associations_to_dataframe()
-    return mc_similarity
 
 
 def load_jcn_data() -> DataFrame:
@@ -157,6 +122,9 @@ def add_jcn_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str], pos: s
                 except WordNetError:
                     # Skip incomparable pairs
                     continue
+                except ZeroDivisionError:
+                    # Similarity was zero/distance was infinite
+                    continue
         if minimum_jcn_distance >= 1_000:
             return None
         return minimum_jcn_distance
@@ -168,24 +136,26 @@ def main():
     out_dir = Path("/Users/caiwingfield/Desktop/")
 
     # Load data
-    data_wordsim: DataFrame = load_wordsim_data()
-    data_simlex: DataFrame = load_simlex_data()
-    data_men: DataFrame = load_men_data()
-    data_priming: DataFrame = load_priming_data()
-    data_rel: DataFrame = load_rel_data()
-    data_rg: DataFrame = load_rg65_data()
-    data_mc: DataFrame = load_miller_charles_data()
+    data_wordsim: DataFrame = WordsimAll().associations_to_dataframe()
+    data_simlex: DataFrame = SimlexSimilarity().associations_to_dataframe()
+    data_men: DataFrame = MenSimilarity().associations_to_dataframe()
+    data_rel: DataFrame = RelRelatedness().associations_to_dataframe()
+    data_rg: DataFrame = RubensteinGoodenough().associations_to_dataframe()
+    data_mc: DataFrame = MillerCharlesSimilarity().associations_to_dataframe()
     data_jcn: DataFrame = load_jcn_data()
+    data_swow_r1: DataFrame = SmallWorldOfWords(responses_type=SmallWorldOfWords.ResponsesType.R1).associations_to_dataframe()
+    data_swow_r123: DataFrame = SmallWorldOfWords(responses_type=SmallWorldOfWords.ResponsesType.R123).associations_to_dataframe()
 
     # Add sensorimotor predictors
     add_extra_predictors(data_wordsim, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="nelson")
     add_extra_predictors(data_simlex, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="nelson")
     add_extra_predictors(data_men, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="nelson")
-    add_extra_predictors(data_priming, word_key_cols=(SppData.Columns.prime_word, SppData.Columns.target_word), pos="nelson")
     add_extra_predictors(data_rel, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="n")
     add_extra_predictors(data_rg, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="n")
     add_extra_predictors(data_mc, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="n")
     add_extra_predictors(data_jcn, ("CUE", "TARGET"), pos="nelson")
+    add_extra_predictors(data_swow_r1, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="nelson")
+    add_extra_predictors(data_swow_r123, word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), pos="nelson")
 
     # Save
     with open(Path(out_dir, "wordsim.csv"), mode="w", encoding="utf-8") as out_file:
@@ -194,8 +164,6 @@ def main():
         data_simlex.to_csv(out_file, header=True, index=False)
     with open(Path(out_dir, "men.csv"), mode="w", encoding="utf-8") as out_file:
         data_men.to_csv(out_file, header=True, index=False)
-    with open(Path(out_dir, "priming.csv"), mode="w", encoding="utf-8") as out_file:
-        data_priming.to_csv(out_file, header=True, index=False)
     with open(Path(out_dir, "rel.csv"), mode="w", encoding="utf-8") as out_file:
         data_rel.to_csv(out_file, header=True, index=False)
     with open(Path(out_dir, "rg.csv"), mode="w", encoding="utf-8") as out_file:
@@ -204,6 +172,10 @@ def main():
         data_mc.to_csv(out_file, header=True, index=False)
     with open(Path(out_dir, "jcn.csv"), mode="w", encoding="utf-8") as out_file:
         data_jcn.to_csv(out_file, header=True, index=False)
+    with open(Path(out_dir, "swow_r1.csv"), mode="w", encoding="utf-8") as out_file:
+        data_swow_r1.to_csv(out_file, header=True, index=False)
+    with open(Path(out_dir, "swow_r123.csv"), mode="w", encoding="utf-8") as out_file:
+        data_swow_r123.to_csv(out_file, header=True, index=False)
 
 
 if __name__ == '__main__':
