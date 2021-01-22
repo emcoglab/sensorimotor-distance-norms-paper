@@ -175,7 +175,7 @@ if __name__ == '__main__':
 
     basicConfig(format='%(asctime)s | %(levelname)s | %(module)s | %(message)s', datefmt="%Y-%m-%d %H:%M:%S", level=INFO)
 
-    save_dir = Path("/Users/caiwingfield/Desktop/")
+    save_dir = Path("/Users/caiwingfield/Resilio Sync/Lancaster/CogSci 2021/")
 
     process(save_dir, "rg.csv", lambda: RubensteinGoodenough().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n")
     process(save_dir, "miller_charles.csv", lambda: MillerCharlesSimilarity().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n")
