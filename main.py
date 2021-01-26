@@ -140,9 +140,14 @@ def add_jcn_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str], pos: s
 
 
 def add_lsa_predictor(data, word_key_cols, lsa_filename):
+    predictor_name = "LSA"
+    if predictor_name in data.columns:
+        _logger.info("Predictor already exists, skipping")
+        return
+
     with Path(Path(__file__).parent, "data", "LSA", lsa_filename).open("r") as lsa_file:
         lsa_deets: DataFrame = read_csv(lsa_file, header=None)
-    lsa_deets.columns = [*word_key_cols, "LSA"]
+    lsa_deets.columns = [*word_key_cols, predictor_name]
     data = merge(data, lsa_deets, on=list(word_key_cols), how="left")
     return data
 
@@ -171,6 +176,7 @@ def process(out_dir: str,
     _logger.info("Saving")
     with data_path.open(mode="w") as out_file:
         data.to_csv(out_file, header=True, index=False)
+
     if pos is not None:
         _logger.info("Adding WordNet JCN predictor")
         add_jcn_predictor(data, word_key_cols, pos)
@@ -180,7 +186,8 @@ def process(out_dir: str,
 
     if lsa_filename is not None:
         _logger.info("Adding LSA predictor")
-        add_lsa_predictor(data, word_key_cols, lsa_filename)
+        data = add_lsa_predictor(data, word_key_cols, lsa_filename)
+        _logger.info("Saving")
         with data_path.open(mode="w") as out_file:
             data.to_csv(out_file, header=True, index=False)
 
