@@ -6,16 +6,14 @@ from nltk.corpus import wordnet_ic, wordnet
 # noinspection PyProtectedMember
 from nltk.corpus.reader import WordNetError, NOUN, VERB, ADJ, ADV
 from numpy import inf
-from pandas import DataFrame, read_csv
+from pandas import DataFrame, read_csv, merge
 
 from linguistic_distributional_models.evaluation.association import MenSimilarity, WordsimAll, \
-    SimlexSimilarity, WordAssociationTest, RelRelatedness, RubensteinGoodenough, MillerCharlesSimilarity, \
-    SmallWorldOfWords
+    SimlexSimilarity, WordAssociationTest, RelRelatedness, RubensteinGoodenough, MillerCharlesSimilarity
 from linguistic_distributional_models.utils.logging import print_progress
 from linguistic_distributional_models.utils.maths import DistanceType, distance
 from sensorimotor_norms.exceptions import WordNotInNormsError
 from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
-
 
 _logger = getLogger(__name__)
 
@@ -141,11 +139,21 @@ def add_jcn_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str], pos: s
     dataset[predictor_name] = dataset.apply(calc_jcn_distance, axis=1)
 
 
+def add_lsa_predictor(data, word_key_cols, lsa_filename):
+    with Path(Path(__file__).parent, "data", "LSA", lsa_filename).open("r") as lsa_file:
+        lsa_deets: DataFrame = read_csv(lsa_file, header=None)
+    lsa_deets.columns = [*word_key_cols, "LSA"]
+    data = merge(data, lsa_deets, on=list(word_key_cols), how="left")
+    return data
+
+
 def process(out_dir: str,
             out_file_name: str,
             load_from_source: Callable[[], DataFrame],
             word_key_cols: Tuple[str, str],
-            pos: Optional[str]):
+            pos: Optional[str],
+            lsa_filename: Optional[str],
+            ):
     _logger.info(out_file_name)
 
     data_path = Path(out_dir, out_file_name)
@@ -170,6 +178,12 @@ def process(out_dir: str,
         with data_path.open(mode="w") as out_file:
             data.to_csv(out_file, header=True, index=False)
 
+    if lsa_filename is not None:
+        _logger.info("Adding LSA predictor")
+        add_lsa_predictor(data, word_key_cols, lsa_filename)
+        with data_path.open(mode="w") as out_file:
+            data.to_csv(out_file, header=True, index=False)
+
 
 if __name__ == '__main__':
 
@@ -181,10 +195,10 @@ if __name__ == '__main__':
     process(save_dir, "miller_charles.csv", lambda: MillerCharlesSimilarity().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n")
     process(save_dir, "rel.csv", lambda: RelRelatedness().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n")
     process(save_dir, "wordsim.csv", lambda: WordsimAll().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "nelson")
-    process(save_dir, "simlex.csv", lambda: SimlexSimilarity().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "nelson")
+    process(save_dir, "simlex.csv", lambda: SimlexSimilarity().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "nelson", lsa_filename="simlex-lsa.csv")
     process(save_dir, "men.csv", lambda: MenSimilarity().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "nelson")
-    process(save_dir, "jcn.csv", lambda: load_jcn_data(), ("CUE", "TARGET"), "nelson")
-    process(save_dir, "swow_r1.csv", lambda: SmallWorldOfWords(responses_type=SmallWorldOfWords.ResponsesType.R1).associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n")
-    process(save_dir, "swow_r123.csv", lambda: SmallWorldOfWords(responses_type=SmallWorldOfWords.ResponsesType.R123).associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n")
+    # process(save_dir, "jcn.csv", lambda: load_jcn_data(), ("CUE", "TARGET"), "nelson")
+    # process(save_dir, "swow_r1.csv", lambda: SmallWorldOfWords(responses_type=SmallWorldOfWords.ResponsesType.R1).associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n")
+    # process(save_dir, "swow_r123.csv", lambda: SmallWorldOfWords(responses_type=SmallWorldOfWords.ResponsesType.R123).associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n")
 
     _logger.info("Done!")
