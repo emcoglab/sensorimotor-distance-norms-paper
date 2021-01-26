@@ -198,12 +198,36 @@ if __name__ == '__main__':
 
     save_dir = Path("/Users/caiwingfield/Resilio Sync/Lancaster/CogSci 2021/")
 
-    process(save_dir, "rg.csv", lambda: RubensteinGoodenough().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n", lsa_filename="rg-lsa.csv")
-    process(save_dir, "miller_charles.csv", lambda: MillerCharlesSimilarity().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n", lsa_filename="miller-charles-lsa.csv")
-    process(save_dir, "rel.csv", lambda: RelRelatedness().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n", lsa_filename="rel-lsa.csv")
-    process(save_dir, "wordsim.csv", lambda: WordsimAll().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "nelson", lsa_filename="wordsim-lsa.csv")
-    process(save_dir, "simlex.csv", lambda: SimlexSimilarity().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "nelson", lsa_filename="simlex-lsa.csv")
-    process(save_dir, "men.csv", lambda: MenSimilarity().associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "nelson", lsa_filename="men-lsa.csv")
+    process(save_dir, "rg.csv",
+            lambda: RubensteinGoodenough().associations_to_dataframe(),
+            (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2),
+            "n",
+            lsa_filename="rg-lsa.csv")
+    process(save_dir, "miller_charles.csv",
+            lambda: MillerCharlesSimilarity().associations_to_dataframe(),
+            (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2),
+            "n",
+            lsa_filename="miller-charles-lsa.csv")
+    process(save_dir, "rel.csv",
+            lambda: RelRelatedness().associations_to_dataframe(),
+            (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2),
+            "n",
+            lsa_filename="rel-lsa.csv")
+    process(save_dir, "wordsim.csv",
+            lambda: WordsimAll().associations_to_dataframe(),
+            (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2),
+            "nelson",
+            lsa_filename="wordsim-lsa.csv")
+    process(save_dir, "simlex.csv",
+            lambda: SimlexSimilarity().associations_to_dataframe(),
+            (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2),
+            "nelson",
+            lsa_filename="simlex-lsa.csv")
+    process(save_dir, "men.csv",
+            lambda: MenSimilarity().associations_to_dataframe(),
+            (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2),
+            "nelson",
+            lsa_filename="men-lsa.csv")
     # process(save_dir, "jcn.csv", lambda: load_jcn_data(), ("CUE", "TARGET"), "nelson", lsa_filename=None)
     # process(save_dir, "swow_r1.csv", lambda: SmallWorldOfWords(responses_type=SmallWorldOfWords.ResponsesType.R1).associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n", lsa_filename=None)
     # process(save_dir, "swow_r123.csv", lambda: SmallWorldOfWords(responses_type=SmallWorldOfWords.ResponsesType.R123).associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n", lsa_filename=None)
