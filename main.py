@@ -1,6 +1,6 @@
 from logging import getLogger, basicConfig, INFO
 from pathlib import Path
-from typing import Tuple, Optional, Callable
+from typing import Tuple, Optional, Callable, Dict
 
 from nltk.corpus import wordnet_ic, wordnet
 # noinspection PyProtectedMember
@@ -15,7 +15,9 @@ from linguistic_distributional_models.utils.maths import DistanceType, distance
 from sensorimotor_norms.exceptions import WordNotInNormsError
 from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
 
+
 _logger = getLogger(__name__)
+_FROM_SCRATCH = True
 
 
 def load_nelson_data():
@@ -37,27 +39,8 @@ def load_jcn_data() -> DataFrame:
     return jcn_data
 
 
-def get_nelson_pos(word: str) -> Optional[str]:
-    nelson_to_wordnet = {
-        "n": NOUN,
-        "v": VERB,
-        "aj": ADJ,
-        "ad": ADV,
-    }
-    try:
-        pos = NELSON[NELSON["Targets"] == word]["Part of Speech"].iloc[0]
-    except IndexError:
-        # Word not found
-        return None
-    try:
-        return nelson_to_wordnet[pos]
-    except KeyError:
-        # These are the only POSs we support
-        return None
-
-
-def add_sensorimotor_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str]):
-    predictor_name = "Sensorimotor distance"
+def add_sensorimotor_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str], distance_type: DistanceType):
+    predictor_name = f"Sensorimotor distance ({distance_type.name})"
     if predictor_name in dataset.columns:
         _logger.info("Predictor already exists, skipping")
         return
@@ -70,11 +53,11 @@ def add_sensorimotor_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str
     def calc_sensorimotor_distance(row):
         nonlocal i
         i += 1
-        print_progress(i, n, prefix="Sensorimotor:          ", bar_length=200)
+        print_progress(i, n, prefix=f"Sensorimotor {distance_type.name}: ", bar_length=200)
         try:
             v1 = sn.vector_for_word(row[key_col_1])
             v2 = sn.vector_for_word(row[key_col_2])
-            return distance(v1, v2, distance_type=DistanceType.cosine)
+            return distance(v1, v2, distance_type=distance_type)
         except WordNotInNormsError:
             return None
 
@@ -82,8 +65,8 @@ def add_sensorimotor_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str
     dataset[predictor_name] = dataset.apply(calc_sensorimotor_distance, axis=1)
 
 
-def add_jcn_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str], pos: str):
-    predictor_name = "JCN distance"
+def add_wordnet_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str], pos_filename: str):
+    predictor_name = "WordNet distance (JCN)"
     if predictor_name in dataset.columns:
         _logger.info("Predictor already exists, skipping")
         return
@@ -91,8 +74,42 @@ def add_jcn_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str], pos: s
 
     brown_ic = wordnet_ic.ic('ic-brown.dat')
 
+    elex_to_wordnet = {
+        "nn": NOUN,
+        "vb": VERB,
+        "jj": ADJ,
+        "rb": ADV,
+    }
+    elex_pos: Dict[str, str]
+    if pos_filename:
+        with Path(Path(__file__).parent, "data", "elexicon", pos_filename).open("r") as pos_file:
+            elex_df = read_csv(pos_file, header=0, index_col=None, delimiter="\t")
+            elex_df.set_index("Word", inplace=True)
+            elex_dict: dict = elex_df.to_dict('index')
+            elex_pos = {
+                word: [
+                    elex_to_wordnet[pos.lower()]
+                    for pos in data["POS"].split("|")
+                    if pos in elex_to_wordnet
+                ]
+                for word, data in elex_dict.items()
+            }
+    else:
+        elex_pos = dict()
+
     i = 0
     n = dataset.shape[0]
+
+    def get_pos(word) -> Optional[str]:
+        if elex_pos is None:
+            return None
+        try:
+            # Assume Elexicon lists POS in precedence order
+            return elex_pos[word][0]
+        except KeyError:
+            return None
+        except IndexError:
+            return None
 
     def calc_jcn_distance(row):
         nonlocal i
@@ -104,14 +121,11 @@ def add_jcn_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str], pos: s
         w2 = row[key_col_2]
 
         # Get POS
-        if pos.lower() == "nelson":
-            pos_1 = get_nelson_pos(w1)
-            pos_2 = get_nelson_pos(w2)
-            if pos_1 != pos_2:
-                # Can only compute distances between word pairs of the same POS
-                return None
-        else:
-            pos_1 = pos_2 = pos
+        pos_1 = get_pos(w1)
+        pos_2 = get_pos(w2)
+        # if pos_1 != pos_2:
+        #     Can only compute distances between word pairs of the same POS
+            # return None
 
         # Get JCN
         try:
@@ -156,14 +170,14 @@ def process(out_dir: str,
             out_file_name: str,
             load_from_source: Callable[[], DataFrame],
             word_key_cols: Tuple[str, str],
-            pos: Optional[str],
+            pos_filename: Optional[str],
             lsa_filename: Optional[str],
             ):
     _logger.info(out_file_name)
 
     data_path = Path(out_dir, out_file_name)
     data: DataFrame
-    if not data_path.exists():
+    if _FROM_SCRATCH or not data_path.exists():
         _logger.info("Loading from source")
         data = load_from_source()
     else:
@@ -171,15 +185,9 @@ def process(out_dir: str,
         with data_path.open(mode="r") as data_file:
             data = read_csv(data_file, header=0, index_col=None)
 
-    _logger.info("Adding sensorimotor predictor")
-    add_sensorimotor_predictor(data, word_key_cols)
-    _logger.info("Saving")
-    with data_path.open(mode="w") as out_file:
-        data.to_csv(out_file, header=True, index=False)
-
-    if pos is not None:
+    if pos_filename is not None:
         _logger.info("Adding WordNet JCN predictor")
-        add_jcn_predictor(data, word_key_cols, pos)
+        add_wordnet_predictor(data, word_key_cols, pos_filename)
         _logger.info("Saving")
         with data_path.open(mode="w") as out_file:
             data.to_csv(out_file, header=True, index=False)
@@ -191,6 +199,17 @@ def process(out_dir: str,
         with data_path.open(mode="w") as out_file:
             data.to_csv(out_file, header=True, index=False)
 
+    _logger.info("Adding sensorimotor predictor")
+    add_sensorimotor_predictor(data, word_key_cols, distance_type=DistanceType.Minkowski3)
+    add_sensorimotor_predictor(data, word_key_cols, distance_type=DistanceType.cosine)
+    # add_sensorimotor_predictor(data, word_key_cols, distance_type=DistanceType.correlation)
+    # add_sensorimotor_predictor(data, word_key_cols, distance_type=DistanceType.Euclidean)
+    _logger.info("Saving")
+    with data_path.open(mode="w") as out_file:
+        data.to_csv(out_file, header=True, index=False)
+
+    _logger.info("")
+
 
 if __name__ == '__main__':
 
@@ -201,34 +220,38 @@ if __name__ == '__main__':
     process(save_dir, "rg.csv",
             lambda: RubensteinGoodenough().associations_to_dataframe(),
             (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2),
-            "n",
+            pos_filename="rg-pos.tab",
             lsa_filename="rg-lsa.csv")
     process(save_dir, "miller_charles.csv",
             lambda: MillerCharlesSimilarity().associations_to_dataframe(),
             (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2),
-            "n",
+            pos_filename="miller-charles-pos.tab",
             lsa_filename="miller-charles-lsa.csv")
     process(save_dir, "rel.csv",
             lambda: RelRelatedness().associations_to_dataframe(),
             (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2),
-            "n",
+            pos_filename="rel-pos.tab",
             lsa_filename="rel-lsa.csv")
     process(save_dir, "wordsim.csv",
             lambda: WordsimAll().associations_to_dataframe(),
             (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2),
-            "nelson",
+            pos_filename="wordsim-pos.tab",
             lsa_filename="wordsim-lsa.csv")
     process(save_dir, "simlex.csv",
             lambda: SimlexSimilarity().associations_to_dataframe(),
             (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2),
-            "nelson",
+            pos_filename="simlex-pos.tab",
             lsa_filename="simlex-lsa.csv")
     process(save_dir, "men.csv",
             lambda: MenSimilarity().associations_to_dataframe(),
             (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2),
-            "nelson",
+            pos_filename="men-pos.tab",
             lsa_filename="men-lsa.csv")
-    # process(save_dir, "jcn.csv", lambda: load_jcn_data(), ("CUE", "TARGET"), "nelson", lsa_filename=None)
+    process(save_dir, "jcn.csv",
+            lambda: load_jcn_data(),
+            ("CUE", "TARGET"),
+            pos_filename="jcn-pos.tab",
+            lsa_filename=None)
     # process(save_dir, "swow_r1.csv", lambda: SmallWorldOfWords(responses_type=SmallWorldOfWords.ResponsesType.R1).associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n", lsa_filename=None)
     # process(save_dir, "swow_r123.csv", lambda: SmallWorldOfWords(responses_type=SmallWorldOfWords.ResponsesType.R123).associations_to_dataframe(), (WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2), "n", lsa_filename=None)
 
