@@ -1,13 +1,35 @@
 from pathlib import Path
+from random import seed
 
 from numpy import dot, array, transpose, corrcoef, exp, zeros, fill_diagonal, searchsorted, ix_, save, load
+from numpy.random import permutation
 from pandas import read_csv
 from scipy.io import loadmat
 from scipy.spatial.distance import squareform
+from scipy.stats import percentileofscore
 
 from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
 
+seed(2)
+
 data_dir = Path(Path(__file__).parent, "data", "hebart")
+n_perms = 10_000
+
+
+# Compute a p-value by randomisation test
+def randomisation_p(rdm_1, rdm_2, observed_r, n_perms):
+    r_perms = zeros(n_perms)
+    c1 = squareform(rdm_1)
+    for perm_i in range(n_perms):
+        # if perm_i % 1000 == 0: print(perm_i)
+        perm = permutation(48)
+        r_perms[perm_i] = corrcoef(
+            c1,
+            squareform(rdm_2[ix_(perm, perm)])
+        )[0, 1]
+    p_value = 1 - (percentileofscore(r_perms, observed_r) / 100)
+    return p_value
+
 
 # region Loading and preparing data
 
@@ -59,9 +81,9 @@ r48 = corrcoef(
     # model dissimilarity matrix
     squareform(1-spose_sim48),
     # "true" dissimilarity matrix
-    squareform(rdm_48_triplet))
-print(r48[0, 1])  # .89824297
-
+    squareform(rdm_48_triplet))[0, 1]
+p_value = randomisation_p(rdm_1=1 - spose_sim48, rdm_2=rdm_48_triplet, observed_r=r48, n_perms=n_perms)
+print(f"model vs ppts: {r48}; p={p_value} ({n_perms:,})")  # .89824297
 
 # endregion
 
@@ -105,13 +127,15 @@ else:
 
 sm_r48 = corrcoef(
     squareform(1-sm_sim48),
-    squareform(rdm_48_triplet))
-print(sm_r48[0, 1])  # 0.2200492
+    squareform(rdm_48_triplet))[0, 1]
+p_value = randomisation_p(rdm_1=1 - sm_sim48, rdm_2=rdm_48_triplet, observed_r=sm_r48, n_perms=n_perms)
+print(f"sm vs ppts: {sm_r48}; p={p_value} ({n_perms:,})")  # 0.2200492
 
 sm_spose_r48 = corrcoef(
     squareform(1-sm_sim48),
-    squareform(1-spose_sim48))
-print(sm_spose_r48[0, 1])  # 0.1899582
+    squareform(1-spose_sim48))[0, 1]
+p_value = randomisation_p(rdm_1=1 - sm_sim48, rdm_2=1-spose_sim48, observed_r=sm_spose_r48, n_perms=n_perms)
+print(f"sm vs model: {sm_spose_r48}; p={p_value} ({n_perms:,})")  # 0.1899582
 
 # endregion
 
