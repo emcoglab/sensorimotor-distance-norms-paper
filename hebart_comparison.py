@@ -5,8 +5,10 @@ from numpy import dot, array, transpose, corrcoef, exp, zeros, fill_diagonal, se
 from numpy.random import permutation
 from pandas import read_csv
 from scipy.io import loadmat
+from scipy.spatial import distance_matrix
 from scipy.spatial.distance import squareform
 from scipy.stats import percentileofscore
+from sklearn.metrics.pairwise import cosine_distances
 
 from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
 
@@ -99,12 +101,13 @@ assert(len(set(sm.iter_words()) & set(words48)))
 # Get data matrix for all words (that we can)
 sm_words = sorted(set(sm.iter_words()) & set(words))
 sm_data = sm.matrix_for_words(sm_words)
-sm_dotproduct = dot(sm_data, transpose(sm_data))
+sm_rdm_minkowski = distance_matrix(sm_data, sm_data, p=3)
+sm_rdm_cosine = cosine_distances(sm_data, sm_data)
 
 sm_wordposition48 = searchsorted(sm_words, words48)
-cache_sm_sim48 = Path(data_dir, "cache_sm_sim48.npy")
-if not cache_sm_sim48.exists():
-    esim = exp(sm_dotproduct)
+cache_sm_sim48_cosine = Path(data_dir, "cache_sm_sim48_cosine.npy")
+if not cache_sm_sim48_cosine.exists():
+    esim = exp(sm_rdm_cosine)
     cp = zeros((len(sm_words), len(sm_words)))
     for i in range(len(sm_words)):
         print(i)
@@ -119,23 +122,58 @@ if not cache_sm_sim48.exists():
     cp /= 48
     cp += transpose(cp)
     fill_diagonal(cp, 1)
-    sm_sim48 = cp[ix_(sm_wordposition48, sm_wordposition48)]
+    sm_sim48_cosine = cp[ix_(sm_wordposition48, sm_wordposition48)]
 
-    save(cache_sm_sim48, sm_sim48)
+    save(cache_sm_sim48_cosine, sm_sim48_cosine)
 else:
-    sm_sim48 = load(cache_sm_sim48)
+    sm_sim48_cosine = load(cache_sm_sim48_cosine)
 
-sm_r48 = corrcoef(
-    squareform(1-sm_sim48),
+cache_sm_sim48_minkowski = Path(data_dir, "cache_sm_sim48_minkowski.npy")
+if not cache_sm_sim48_minkowski.exists():
+    esim = exp(sm_rdm_minkowski)
+    cp = zeros((len(sm_words), len(sm_words)))
+    for i in range(len(sm_words)):
+        print(i)
+        for j in range(i+1, len(sm_words)):
+            ctmp = zeros((1, len(sm_words)))
+            for k_ind in range(len(sm_wordposition48)):
+                k = sm_wordposition48[k_ind]
+                if (k == i) or (k == j):
+                    continue
+                ctmp[0, k] = esim[i, j] / ( esim[i, j] + esim[i, k] + esim[j, i] )
+            cp[i, j] = ctmp.sum()
+    cp /= 48
+    cp += transpose(cp)
+    fill_diagonal(cp, 1)
+    sm_sim48_minkowski = cp[ix_(sm_wordposition48, sm_wordposition48)]
+
+    save(cache_sm_sim48_cosine, sm_sim48_minkowski)
+else:
+    sm_sim48_minkowski = load(cache_sm_sim48_cosine)
+
+sm_r48_cosine = corrcoef(
+    squareform(1 - sm_sim48_cosine),
     squareform(rdm_48_triplet))[0, 1]
-p_value = randomisation_p(rdm_1=1 - sm_sim48, rdm_2=rdm_48_triplet, observed_r=sm_r48, n_perms=n_perms)
-print(f"sm vs ppts: {sm_r48}; p={p_value} ({n_perms:,})")  # 0.2200492
+p_value = randomisation_p(rdm_1=1 - sm_sim48_cosine, rdm_2=rdm_48_triplet, observed_r=sm_r48_cosine, n_perms=n_perms)
+print(f"sm_cosine vs ppts: {sm_r48_cosine}; p={p_value} ({n_perms:,})")
 
-sm_spose_r48 = corrcoef(
-    squareform(1-sm_sim48),
+sm_spose_r48_cosine = corrcoef(
+    squareform(1 - sm_sim48_cosine),
     squareform(1-spose_sim48))[0, 1]
-p_value = randomisation_p(rdm_1=1 - sm_sim48, rdm_2=1-spose_sim48, observed_r=sm_spose_r48, n_perms=n_perms)
-print(f"sm vs model: {sm_spose_r48}; p={p_value} ({n_perms:,})")  # 0.1899582
+p_value = randomisation_p(rdm_1=1 - sm_sim48_cosine, rdm_2=1 - spose_sim48, observed_r=sm_spose_r48_cosine, n_perms=n_perms)
+print(f"sm_cosine vs model: {sm_spose_r48_cosine}; p={p_value} ({n_perms:,})")
+
+sm_r48_minkowski = corrcoef(
+    squareform(1 - sm_sim48_minkowski),
+    squareform(rdm_48_triplet))[0, 1]
+p_value = randomisation_p(rdm_1=1 - sm_sim48_minkowski, rdm_2=rdm_48_triplet, observed_r=sm_r48_minkowski, n_perms=n_perms)
+print(f"sm_minkowski vs ppts: {sm_r48_minkowski}; p={p_value} ({n_perms:,})")
+
+sm_spose_r48_minkowski = corrcoef(
+    squareform(1 - sm_sim48_minkowski),
+    squareform(1-spose_sim48))[0, 1]
+p_value = randomisation_p(rdm_1=1 - sm_sim48_minkowski, rdm_2=1 - spose_sim48, observed_r=sm_spose_r48_minkowski, n_perms=n_perms)
+print(f"sm_minkowski vs model: {sm_spose_r48_minkowski}; p={p_value} ({n_perms:,})")
 
 # endregion
 
