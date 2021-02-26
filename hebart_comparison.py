@@ -1,7 +1,9 @@
 from pathlib import Path
 from random import seed
 
-from numpy import dot, array, transpose, corrcoef, exp, zeros, fill_diagonal, searchsorted, ix_, save, load
+from nltk.corpus import wordnet, wordnet_ic
+from nltk.corpus.reader import NOUN
+from numpy import dot, array, transpose, corrcoef, exp, zeros, fill_diagonal, searchsorted, ix_
 from numpy.random import permutation
 from pandas import read_csv
 from scipy.io import loadmat
@@ -14,6 +16,8 @@ from sklearn.metrics.pairwise import cosine_distances
 from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
 
 seed(2)
+
+brown_ic = wordnet_ic.ic('ic-brown.dat')
 
 data_dir = Path(Path(__file__).parent, "data", "hebart")
 n_perms = 10_000
@@ -28,7 +32,9 @@ def mean_softmax_prob_matrix(all_words, select_words, full_similarity_matrix, pr
     """
     n_all_conditions = len(all_words)
     n_subset_conditions = len(select_words)
-    word_positions_selected = searchsorted(all_words, select_words)
+    # Thanks to https://stackoverflow.com/a/33678576/2883198
+    sort_idx = array(all_words).argsort()
+    word_positions_selected = sort_idx[searchsorted(all_words, select_words, sorter=sort_idx)]
     # Make sure we're not missing any conditions
     assert len(word_positions_selected) == n_subset_conditions
 
@@ -79,6 +85,27 @@ def randomisation_p(rdm_1, rdm_2, observed_r, n_perms):
         )[0, 1]
     p_value = 1 - (percentileofscore(r_perms, observed_r) / 100)
     return p_value
+
+
+def similarity(word_1, word_2):
+    synsets1 = wordnet.synsets(word_1, pos=NOUN)
+    synsets2 = wordnet.synsets(word_2, pos=NOUN)
+    max_jcn_distance = 0
+    for s1 in synsets1:
+        for s2 in synsets2:
+            jcn = s1.jcn_similarity(s2, brown_ic)
+            max_jcn_distance = max(max_jcn_distance, jcn)
+    return max_jcn_distance
+
+
+def compute_wordnet_sm(words):
+    n_words = len(words)
+    similarity_matrix = zeros((n_words, n_words))
+    for i in range(n_words):
+        for j in range(n_words):
+            similarity_matrix[i, j] = similarity(words[i], words[j])
+    fill_diagonal(similarity_matrix, 1)
+    return similarity_matrix
 
 
 def main():
@@ -139,44 +166,55 @@ def main():
     # region Generate SM RDM for 48 words
 
     sm = SensorimotorNorms()
-    assert(len(set(sm.iter_words()) & set(words48)))  # We have the 48 words we need
-    sm_words = sorted(set(sm.iter_words()) & set(words))
 
     # try and emulate the mean regularised probability from above
 
     # Get data matrix for all words (that we can)
-    sm_data = sm.matrix_for_words(sm_words)
+    sm_data = sm.matrix_for_words(words48)
 
     sm_rdm_cosine = cosine_distances(sm_data, sm_data)
-    sm_sim48_cosine = mean_softmax_prob_matrix(all_words=sm_words, select_words=words48, full_similarity_matrix=1 - sm_rdm_cosine, prefix="SM cosine")
+    sm_sim48_cosine = mean_softmax_prob_matrix(all_words=words48, select_words=words48, full_similarity_matrix=1 - sm_rdm_cosine, prefix="SM cosine")
     rdm48_sensorimotor_cosine = 1-sm_sim48_cosine
 
     sm_r48_cosine = corrcoef(
         squareform(rdm48_sensorimotor_cosine),
         squareform(rdm48_participant))[0, 1]
     p_value = randomisation_p(rdm_1=rdm48_sensorimotor_cosine, rdm_2=rdm48_participant, observed_r=sm_r48_cosine, n_perms=n_perms)
-    print(f"sm_cosine vs ppts: {sm_r48_cosine}; p={p_value} ({n_perms:,})")
+    print(f"sm_cosine vs ppts: {sm_r48_cosine}; p={p_value} ({n_perms:,})")  # .3163023620890325
+    print(f"  Without softmax: {corrcoef(squareform(sm_rdm_cosine), squareform(rdm48_participant))[0,1]}")
 
     sm_rdm_minkowski = distance_matrix(sm_data, sm_data, p=3)
     sm_sm_minkowski = 1 - (sm_rdm_minkowski / max(sm_rdm_minkowski.flatten()[:])); fill_diagonal(sm_sm_minkowski, 1)
-    sm_sim48_minkowski = mean_softmax_prob_matrix(all_words=sm_words, select_words=words48, full_similarity_matrix=sm_sm_minkowski, prefix="SM Minkowski-3")
+    sm_sim48_minkowski = mean_softmax_prob_matrix(all_words=words48, select_words=words48, full_similarity_matrix=sm_sm_minkowski, prefix="SM Minkowski-3")
     rdm48_sensorimotor_minkowski = 1 - sm_sim48_minkowski
 
     sm_r48_minkowski = corrcoef(
         squareform(rdm48_sensorimotor_minkowski),
         squareform(rdm48_participant))[0, 1]
     p_value = randomisation_p(rdm_1=rdm48_sensorimotor_minkowski, rdm_2=rdm48_participant, observed_r=sm_r48_minkowski, n_perms=n_perms)
-    print(f"sm_minkowski vs ppts: {sm_r48_minkowski}; p={p_value} ({n_perms:,})")
+    print(f"sm_minkowski vs ppts: {sm_r48_minkowski}; p={p_value} ({n_perms:,})")  # .2704680432064961
+    print(f"  Without softmax: {corrcoef(squareform(sm_rdm_minkowski), squareform(rdm48_participant))[0,1]}")
 
     sm_sm_dotpropduct = dot(sm_data, transpose(sm_data))
-    sm_sim48_dotproduct = mean_softmax_prob_matrix(all_words=sm_words, select_words=words48, full_similarity_matrix=sm_sm_dotpropduct, prefix="SM dotproduct")
+    sm_sim48_dotproduct = mean_softmax_prob_matrix(all_words=words48, select_words=words48, full_similarity_matrix=sm_sm_dotpropduct, prefix="SM dotproduct")
     rdm48_sensorimotor_dotproduct = 1 - sm_sim48_dotproduct
 
     sm_r48_dotproduct = corrcoef(
         squareform(rdm48_sensorimotor_dotproduct),
         squareform(rdm48_participant))[0, 1]
     p_value = randomisation_p(rdm_1=rdm48_sensorimotor_dotproduct, rdm_2=rdm48_participant, observed_r=sm_r48_dotproduct, n_perms=n_perms)
-    print(f"sm_dotproduct vs ppts: {sm_r48_dotproduct}; p={p_value} ({n_perms:,})")
+    print(f"sm_dotproduct vs ppts: {sm_r48_dotproduct}; p={p_value} ({n_perms:,})")  # .2821415691953627
+
+    wordnet_sm = compute_wordnet_sm(words=words48)
+    wordnet_sim48 = mean_softmax_prob_matrix(all_words=words48, select_words=words48, full_similarity_matrix=wordnet_sm, prefix="Wordnet")
+    rdm48_wordnet = 1 - wordnet_sim48
+
+    wordnet_r48 = corrcoef(
+        squareform(rdm48_wordnet),
+        squareform(rdm48_participant))[0, 1]
+    p_value = randomisation_p(rdm_1=rdm48_wordnet, rdm_2=rdm48_participant, observed_r=wordnet_r48, n_perms=n_perms)
+    print(f"wordnet vs ppts: {wordnet_r48}; p={p_value} ({n_perms:,})")
+    print(f"  Without softmax: {corrcoef(squareform(1-wordnet_sm), squareform(rdm48_participant))[0,1]}")
 
     # endregion
 
