@@ -35,10 +35,12 @@ def mean_softmax_prob_matrix(all_words, select_words, similarity_matrix, prefix=
 
     e_similarity_matrix = exp(similarity_matrix)
     cp = zeros((n_all_conditions, n_all_conditions))
-    for i in range(n_all_conditions):
-        print_progress(i, n_all_conditions, prefix=prefix)
-        # Only half of off-diagonal entries
-        for j in range(i+1, n_all_conditions):
+    # Hebart et al.'s original code builds the entire matrix for all conditions, then selects out the relevant
+    # entries. We can hugely speed up this process by only computing the entries we'll eventually select out.
+    for i in word_positions_selected:
+        # print_progress(i, n_all_conditions, prefix=prefix)
+        for j in word_positions_selected:
+            if i == j: continue
             ctmp = zeros((1, n_all_conditions))
             for k in word_positions_selected:
                 # Only interested in distinct triplets
@@ -52,11 +54,11 @@ def mean_softmax_prob_matrix(all_words, select_words, similarity_matrix, prefix=
                                 + e_similarity_matrix[j, k]
                         ))
             cp[i, j] = ctmp.sum()
-    print_progress(n_all_conditions, n_all_conditions, prefix=prefix)
+    # print_progress(n_all_conditions, n_all_conditions, prefix=prefix)
     # Complete average
     cp /= n_subset_conditions
     # Fill in the rest of the symmetric similarity matrix
-    cp += transpose(cp)
+    # cp += transpose(cp)  # No longer need to do this now we're filling in both sides of the matrix in the above loop
     fill_diagonal(cp, 1)
     # Select out words of interest
     selected_similarities = cp[ix_(word_positions_selected, word_positions_selected)]
@@ -163,12 +165,6 @@ def main():
     p_value = randomisation_p(rdm_1=1 - sm_sim48_cosine, rdm_2=rdm_48_triplet, observed_r=sm_r48_cosine, n_perms=n_perms)
     print(f"sm_cosine vs ppts: {sm_r48_cosine}; p={p_value} ({n_perms:,})")
 
-    sm_spose_r48_cosine = corrcoef(
-        squareform(1 - sm_sim48_cosine),
-        squareform(1-spose_sim48))[0, 1]
-    p_value = randomisation_p(rdm_1=1 - sm_sim48_cosine, rdm_2=1 - spose_sim48, observed_r=sm_spose_r48_cosine, n_perms=n_perms)
-    print(f"sm_cosine vs model: {sm_spose_r48_cosine}; p={p_value} ({n_perms:,})")
-
     cache_sm_sim48_minkowski = Path(data_dir, "cache_sm_sim48_minkowski.npy")
     if force_rerun or not cache_sm_sim48_minkowski.exists():
         # TODO: is this ok?
@@ -185,12 +181,6 @@ def main():
         squareform(rdm_48_triplet))[0, 1]
     p_value = randomisation_p(rdm_1=max(sm_rdm_minkowski.flatten()[:]) - sm_sim48_minkowski, rdm_2=rdm_48_triplet, observed_r=sm_r48_minkowski, n_perms=n_perms)
     print(f"sm_minkowski vs ppts: {sm_r48_minkowski}; p={p_value} ({n_perms:,})")
-
-    sm_spose_r48_minkowski = corrcoef(
-        squareform(1 - sm_sim48_minkowski),
-        squareform(1-spose_sim48))[0, 1]
-    p_value = randomisation_p(rdm_1=max(sm_rdm_minkowski.flatten()[:]) - sm_sim48_minkowski, rdm_2=1 - spose_sim48, observed_r=sm_spose_r48_minkowski, n_perms=n_perms)
-    print(f"sm_minkowski vs model: {sm_spose_r48_minkowski}; p={p_value} ({n_perms:,})")
 
     # endregion
 
