@@ -17,7 +17,6 @@ seed(2)
 
 data_dir = Path(Path(__file__).parent, "data", "hebart")
 n_perms = 10_000
-force_rerun = True
 
 
 def mean_softmax_prob_matrix(all_words, select_words, full_similarity_matrix, prefix=""):
@@ -106,14 +105,7 @@ def main():
     # region Figure 2
 
     # Indices of the 48 words within the whole list
-    cache_spose_sim48 = Path(data_dir, "cache_spose_sim48.npy")
-    if force_rerun or not cache_spose_sim48.exists():
-        # Ported from the Matlab. Just what the hell is this doing? Is this computing pairwise softmax probability?
-        spose_sim48 = mean_softmax_prob_matrix(all_words=words, select_words=words48, full_similarity_matrix=dot_product_49, prefix="SPOSE")
-        if not force_rerun:
-            save(cache_spose_sim48, spose_sim48)
-    else:
-        spose_sim48 = load(cache_spose_sim48)
+    spose_sim48 = mean_softmax_prob_matrix(all_words=words, select_words=words48, full_similarity_matrix=dot_product_49, prefix="SPOSE")
     rdm48_spose = 1 - spose_sim48
 
     r48 = corrcoef(
@@ -124,13 +116,7 @@ def main():
     p_value = randomisation_p(rdm_1=rdm48_spose, rdm_2=rdm48_participant, observed_r=r48, n_perms=n_perms)
     print(f"model vs ppts: {r48}; p={p_value} ({n_perms:,})")  # .89824297
 
-    cache_spose_sim48_11 = Path(data_dir, "cache_spose_sim48_11.npy")
-    if force_rerun or not cache_spose_sim48_11.exists():
-        spose_sim48_11 = mean_softmax_prob_matrix(all_words=words, select_words=words48, full_similarity_matrix=dot_product_49_11, prefix="SPOSE 11")
-        if not force_rerun:
-            save(cache_spose_sim48_11, spose_sim48_11)
-    else:
-        spose_sim48_11 = load(cache_spose_sim48_11)
+    spose_sim48_11 = mean_softmax_prob_matrix(all_words=words, select_words=words48, full_similarity_matrix=dot_product_49_11, prefix="SPOSE 11")
     rdm48_spose_11 = 1 - spose_sim48_11
 
     r48_11 = corrcoef(
@@ -139,13 +125,7 @@ def main():
     p_value = randomisation_p(rdm_1=rdm48_spose_11, rdm_2=rdm48_participant, observed_r=r48_11, n_perms=n_perms)
     print(f"model[11] vs ppts: {r48_11}; p={p_value} ({n_perms:,})")
 
-    cache_spose_sim48_bottom_11 = Path(data_dir, "cache_spose_sim48_bottom_11.npy")
-    if force_rerun or not cache_spose_sim48_bottom_11.exists():
-        spose_sim48_bottom_11 = mean_softmax_prob_matrix(all_words=words, select_words=words48, full_similarity_matrix=dot_product_49_bottom_11, prefix="SPOSE bottom_11")
-        if not force_rerun:
-            save(cache_spose_sim48_bottom_11, spose_sim48_bottom_11)
-    else:
-        spose_sim48_bottom_11 = load(cache_spose_sim48_bottom_11)
+    spose_sim48_bottom_11 = mean_softmax_prob_matrix(all_words=words, select_words=words48, full_similarity_matrix=dot_product_49_bottom_11, prefix="SPOSE bottom_11")
     rdm48_spose_bottom_11 = 1 - spose_sim48_bottom_11
 
     r48_bottom_11 = corrcoef(
@@ -167,14 +147,8 @@ def main():
     # Get data matrix for all words (that we can)
     sm_data = sm.matrix_for_words(sm_words)
 
-    cache_sm_sim48_cosine = Path(data_dir, "cache_sm_sim48_cosine.npy")
-    if force_rerun or not cache_sm_sim48_cosine.exists():
-        sm_rdm_cosine = cosine_distances(sm_data, sm_data)
-        sm_sim48_cosine = mean_softmax_prob_matrix(all_words=sm_words, select_words=words48, full_similarity_matrix=1 - sm_rdm_cosine, prefix="SM cosine")
-        if not force_rerun:
-            save(cache_sm_sim48_cosine, sm_sim48_cosine)
-    else:
-        sm_sim48_cosine = load(cache_sm_sim48_cosine)
+    sm_rdm_cosine = cosine_distances(sm_data, sm_data)
+    sm_sim48_cosine = mean_softmax_prob_matrix(all_words=sm_words, select_words=words48, full_similarity_matrix=1 - sm_rdm_cosine, prefix="SM cosine")
     rdm48_sensorimotor_cosine = 1-sm_sim48_cosine
 
     sm_r48_cosine = corrcoef(
@@ -183,15 +157,9 @@ def main():
     p_value = randomisation_p(rdm_1=rdm48_sensorimotor_cosine, rdm_2=rdm48_participant, observed_r=sm_r48_cosine, n_perms=n_perms)
     print(f"sm_cosine vs ppts: {sm_r48_cosine}; p={p_value} ({n_perms:,})")
 
-    cache_sm_sim48_minkowski = Path(data_dir, "cache_sm_sim48_minkowski.npy")
-    if force_rerun or not cache_sm_sim48_minkowski.exists():
-        sm_rdm_minkowski = distance_matrix(sm_data, sm_data, p=3)
-        sm_sm_minkowski = 1 - (sm_rdm_minkowski / max(sm_rdm_minkowski.flatten()[:])); fill_diagonal(sm_sm_minkowski, 1)
-        sm_sim48_minkowski = mean_softmax_prob_matrix(all_words=sm_words, select_words=words48, full_similarity_matrix=sm_sm_minkowski, prefix="SM Minkowski-3")
-        if not force_rerun:
-            save(cache_sm_sim48_minkowski, sm_sim48_minkowski)
-    else:
-        sm_sim48_minkowski = load(cache_sm_sim48_minkowski)
+    sm_rdm_minkowski = distance_matrix(sm_data, sm_data, p=3)
+    sm_sm_minkowski = 1 - (sm_rdm_minkowski / max(sm_rdm_minkowski.flatten()[:])); fill_diagonal(sm_sm_minkowski, 1)
+    sm_sim48_minkowski = mean_softmax_prob_matrix(all_words=sm_words, select_words=words48, full_similarity_matrix=sm_sm_minkowski, prefix="SM Minkowski-3")
     rdm48_sensorimotor_minkowski = 1 - sm_sim48_minkowski
 
     sm_r48_minkowski = corrcoef(
