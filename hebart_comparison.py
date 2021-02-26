@@ -168,6 +168,16 @@ def main():
     p_value = randomisation_p(rdm_1=rdm48_sensorimotor_minkowski, rdm_2=rdm48_participant, observed_r=sm_r48_minkowski, n_perms=n_perms)
     print(f"sm_minkowski vs ppts: {sm_r48_minkowski}; p={p_value} ({n_perms:,})")
 
+    sm_sm_dotpropduct = dot(sm_data, transpose(sm_data))
+    sm_sim48_dotproduct = mean_softmax_prob_matrix(all_words=sm_words, select_words=words48, full_similarity_matrix=sm_sm_dotpropduct, prefix="SM dotproduct")
+    rdm48_sensorimotor_dotproduct = 1 - sm_sim48_dotproduct
+
+    sm_r48_dotproduct = corrcoef(
+        squareform(rdm48_sensorimotor_dotproduct),
+        squareform(rdm48_participant))[0, 1]
+    p_value = randomisation_p(rdm_1=rdm48_sensorimotor_dotproduct, rdm_2=rdm48_participant, observed_r=sm_r48_dotproduct, n_perms=n_perms)
+    print(f"sm_dotproduct vs ppts: {sm_r48_dotproduct}; p={p_value} ({n_perms:,})")
+
     # endregion
 
     pass
