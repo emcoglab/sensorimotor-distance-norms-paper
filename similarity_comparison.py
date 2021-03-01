@@ -123,9 +123,6 @@ def add_wordnet_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str], po
         # Get POS
         pos_1 = get_pos(w1)
         pos_2 = get_pos(w2)
-        # if pos_1 != pos_2:
-        #     Can only compute distances between word pairs of the same POS
-            # return None
 
         # Get JCN
         try:
