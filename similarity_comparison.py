@@ -66,6 +66,30 @@ def add_sensorimotor_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str
     dataset[predictor_name] = dataset.apply(calc_sensorimotor_distance, axis=1)
 
 
+def add_norms_overlap_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str]):
+    predictor_name = "Buchanan root cosine overlap"
+    if predictor_name in dataset.columns:
+        _logger.info("Predictor already exists, skipping")
+        return
+    key_col_1, key_col_2 = word_key_cols
+    b = BuchananFeatureNorms()
+
+    i = 0
+    n = dataset.shape[0]
+
+    def calc_norms_overlap(row):
+        nonlocal i
+        i += 1
+        print_progress(i, n, prefix=f"Buchanan overlap: ", bar_length=200)
+        try:
+            return b.distance_between(row[key_col_1], row[key_col_2])
+        except KeyError:
+            return None
+
+    # noinspection PyTypeChecker
+    dataset[predictor_name] = dataset.apply(calc_norms_overlap, axis=1)
+
+
 def add_wordnet_predictor(dataset: DataFrame, word_key_cols: Tuple[str, str], pos_filename: str):
     predictor_name = "WordNet distance (JCN)"
     if predictor_name in dataset.columns:
@@ -197,19 +221,16 @@ def process(out_dir: str,
         with data_path.open(mode="w") as out_file:
             data.to_csv(out_file, header=True, index=False)
 
+    _logger.info("Adding Buchanan feature norms overlap predictor")
+    add_norms_overlap_predictor(data, word_key_cols)
+
     _logger.info("Adding sensorimotor predictor")
     add_sensorimotor_predictor(data, word_key_cols, distance_type=DistanceType.Minkowski3)
     add_sensorimotor_predictor(data, word_key_cols, distance_type=DistanceType.cosine)
-    # add_sensorimotor_predictor(data, word_key_cols, distance_type=DistanceType.correlation)
-    # add_sensorimotor_predictor(data, word_key_cols, distance_type=DistanceType.Euclidean)
+
     _logger.info("Saving")
     with data_path.open(mode="w") as out_file:
         data.to_csv(out_file, header=True, index=False)
-
-    b = BuchananFeatureNorms()
-    coverage = data.loc[data[word_key_cols[0]].isin(b.available_words) & data[word_key_cols[1]].isin(b.available_words)].shape[0] / data.shape[0]
-
-    _logger.info(f"Coverage for {out_file_name}: {100*coverage:2f}%")
 
 
 if __name__ == '__main__':
