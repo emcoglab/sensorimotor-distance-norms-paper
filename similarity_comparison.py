@@ -8,6 +8,7 @@ from nltk.corpus.reader import WordNetError, NOUN, VERB, ADJ, ADV
 from numpy import inf
 from pandas import DataFrame, read_csv, merge
 
+from buchanan_norms import BuchananFeatureNorms
 from linguistic_distributional_models.evaluation.association import MenSimilarity, WordsimAll, \
     SimlexSimilarity, WordAssociationTest, RelRelatedness, RubensteinGoodenough, MillerCharlesSimilarity
 from linguistic_distributional_models.utils.logging import print_progress
@@ -205,7 +206,10 @@ def process(out_dir: str,
     with data_path.open(mode="w") as out_file:
         data.to_csv(out_file, header=True, index=False)
 
-    _logger.info("")
+    b = BuchananFeatureNorms()
+    coverage = data.loc[data[word_key_cols[0]].isin(b.available_words) & data[word_key_cols[1]].isin(b.available_words)].shape[0] / data.shape[0]
+
+    _logger.info(f"Coverage for {out_file_name}: {100*coverage:2f}%")
 
 
 if __name__ == '__main__':
