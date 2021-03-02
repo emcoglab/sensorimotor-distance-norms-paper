@@ -13,6 +13,7 @@ from scipy.stats import percentileofscore
 from sklearn.metrics.pairwise import cosine_distances
 
 # from linguistic_distributional_models.utils.logging import print_progress
+from buchanan_norms import BuchananFeatureNorms
 from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
 
 seed(3)
@@ -124,6 +125,22 @@ def compute_lsa_sm(words):
     assert similarity_matrix_df.columns.to_list() == words
     words_present = similarity_matrix_df.columns[~ similarity_matrix_df.isna().all()].to_list()
     similarity_matrix = similarity_matrix_df[words_present].loc[words_present].to_numpy(dtype=float)
+    return similarity_matrix, words_present
+
+
+def compute_buchanan_sm(words):
+    b = BuchananFeatureNorms()
+    words_present = [
+        word
+        for word in words
+        if word in b.available_words
+    ]
+    n_words = len(words_present)
+    similarity_matrix = zeros((n_words, n_words))
+    for i in range(n_words):
+        for j in range(n_words):
+            similarity_matrix[i, j] = b.distance_between(words_present[i], words_present[j])
+    fill_diagonal(similarity_matrix, 1)
     return similarity_matrix, words_present
 
 
@@ -248,7 +265,18 @@ def main():
     print(f"lsa vs ppts: {lsa_r46}; p={p_value} ({n_perms:,})")
     print(f"  Without softmax: {corrcoef(squareform(1-lsa_sm), squareform(rdm46_participant))[0,1]}")
 
+    buchanan_sm, words18_buchanan = compute_buchanan_sm(words=words48)
+    words18_idxs = find_indices(words48, words18_buchanan)
+    rdm18_participant = rdm48_participant[ix_(words18_idxs, words18_idxs)]
+    buchanan_sim18 = mean_softmax_prob_matrix(all_words=words18_buchanan, full_similarity_matrix=buchanan_sm)
+    rdm18_buchanan = 1 - buchanan_sim18
 
+    buchanan_r18 = corrcoef(
+        squareform(rdm18_buchanan),
+        squareform(rdm18_participant))[0, 1]
+    p_value = randomisation_p(rdm_1=rdm18_buchanan, rdm_2=rdm18_participant, observed_r=buchanan_r18, n_perms=n_perms)
+    print(f"buchanan vs ppts: {buchanan_r18}; p={p_value} ({n_perms:,})")
+    print(f"  Without softmax: {corrcoef(squareform(1-buchanan_sm), squareform(rdm18_participant))[0,1]}")
 
     # endregion
 
