@@ -8,7 +8,7 @@ from aux import logger, logger_format, logger_dateformat
 from linguistic_distributional_models.utils.maths import DistanceType
 from predictors import add_wordnet_predictor, WordnetDistance, add_lsa_predictor, add_norms_overlap_predictor, \
     add_sensorimotor_predictor
-from linguistic_distributional_models.evaluation.association import WordsimAll, WordAssociationTest
+from linguistic_distributional_models.evaluation.association import WordsimAll, WordAssociationTest, SimlexSimilarity
 
 _pos_dir = Path(Path(__file__).parent, "data", "elexicon")
 _lsa_dir = Path(Path(__file__).parent, "data", "LSA")
@@ -46,7 +46,7 @@ def model_wordsim(location: Path, overwrite: bool) -> None:
     save_path = Path(location, "wordsim.csv")
 
     if save_path.exists() and not overwrite:
-        logger.warn(f"{save_path} exists, skipping")
+        logger.warning(f"{save_path} exists, skipping")
         return
 
     common_similarity_modelling(
@@ -58,6 +58,22 @@ def model_wordsim(location: Path, overwrite: bool) -> None:
         save_path=save_path)
 
 
+def model_simlex(location: Path, overwrite: bool) -> None:
+    save_path = Path(location, "simlex.csv")
+
+    if save_path.exists() and not overwrite:
+        logger.warning(f"{save_path} exists, skipping")
+        return
+
+    common_similarity_modelling(
+        # Load data from source:
+        df=SimlexSimilarity().associations_to_dataframe(),
+        word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2),
+        lsa_path=Path(_lsa_dir, "simlex-lsa.csv"),
+        pos_path=Path(_pos_dir, "simlex-pos.tab"),
+        save_path=save_path)
+
+
 if __name__ == '__main__':
     basicConfig(format=logger_format, datefmt=logger_dateformat, level=INFO)
 
@@ -65,5 +81,6 @@ if __name__ == '__main__':
     overwrite = True
 
     model_wordsim(location=save_dir, overwrite=overwrite)
+    model_simlex(location=save_dir, overwrite=overwrite)
 
     logger.info("Done!")

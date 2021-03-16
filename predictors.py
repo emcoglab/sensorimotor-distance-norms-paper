@@ -38,7 +38,7 @@ def add_lsa_predictor(df: DataFrame, word_key_cols: Tuple[str, str], lsa_path: P
     _predictor_name = "LSA"
 
     if _predictor_name in df.columns:
-        logger.warn("Predictor already exists, skipping")
+        logger.warning("Predictor already exists, skipping")
         return df
 
     assert len(word_key_cols) == 2
