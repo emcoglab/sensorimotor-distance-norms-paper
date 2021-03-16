@@ -1,118 +1,20 @@
-from enum import Enum, auto
 from pathlib import Path
-from typing import Tuple, Dict, Optional, List
+from typing import Tuple, Dict, Optional
 
-from nltk.corpus import wordnet_ic, wordnet
+from nltk.corpus import wordnet_ic
 # noinspection PyProtectedMember
-from nltk.corpus.reader import WordNetError
-from numpy import inf
 from pandas import DataFrame, read_csv, merge
 
-from aux import logger, elex_to_wordnet
 from linguistic_distributional_models.utils.logging import print_progress
 from linguistic_distributional_models.utils.maths import distance, DistanceType
 from sensorimotor_norms.exceptions import WordNotInNormsError
 from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
+from aux import logger
+from wordnet import elex_to_wordnet
+from buchanan import BUCHANAN_FEATURE_NORMS
+from wordnet import WordnetAssociation
 
-_brown_ic = wordnet_ic.ic('ic-brown.dat')
-
-
-class WordnetAssociation(Enum):
-    """Representative of a type of Wordnet distance."""
-
-    JCN = auto()  # JCN distance a la Maki et al. (2004)
-    Resnik = auto()  # Resnik similarity
-
-    @property
-    def name(self):
-        if self == self.JCN:
-            return "Jiang-Coranth"
-        if self == self.Resnik:
-            return "Resnik"
-        raise NotImplementedError()
-
-    def association_between(self, word_1, word_2, word_1_pos, word_2_pos) -> Optional[float]:
-        """
-        :param word_1, word_2: The words
-        :param word_1_pos, word_2_pos: The words' respective parts of speech tags
-        :return: The association value, or None if at least one of the words wasn't available.
-        """
-        try:
-            synsets_1 = wordnet.synsets(word_1, pos=word_1_pos)
-            synsets_2 = wordnet.synsets(word_2, pos=word_2_pos)
-
-            if self == self.Resnik:
-                max_similarity = 0
-                for s1 in synsets_1:
-                    for s2 in synsets_2:
-                        max_similarity = max(max_similarity, s1.res_similarity(s2, _brown_ic))
-                return max_similarity
-
-            if self == self.JCN:
-                minimum_jcn_distance = inf
-                for s1 in synsets_1:
-                    for s2 in synsets_2:
-                        try:
-                            minimum_jcn_distance = min(
-                                minimum_jcn_distance,
-                                # Match the formula of Maki et al. (2004)
-                                1 / s1.jcn_similarity(s2, _brown_ic))
-                        except WordNetError:
-                            continue  # Skip incomparable pairs
-                        except ZeroDivisionError:
-                            continue  # Similarity was zero
-                # Catch cases where we're still at inf
-                if minimum_jcn_distance >= 100_000:
-                    return None
-                return minimum_jcn_distance
-
-            raise NotImplementedError()
-
-        except WordNetError:
-            return None
-
-
-class BuchananFeatureNorms:
-
-    class SingleWordsCols:
-        Cue = "CUE"
-
-    class DoubleWordsCols:
-        Cue = "CUE"
-        Target = "TARGET"
-        CosineRoot = "root"
-
-    _data_dir = Path(Path(__file__).parent, "data", "buchanan")
-    _single_words_path = Path(_data_dir, "single_word.csv")
-    _double_words_path = Path(_data_dir, "double_words.csv")
-
-    def __init__(self):
-        with self._double_words_path.open("r") as double_words_file:
-            self.double_words_data: DataFrame = read_csv(double_words_file)
-        with self._single_words_path.open("r") as single_words_file:
-            self.single_words_data: DataFrame = read_csv(single_words_file)
-
-        self.available_words: List[str] = sorted(set(self.single_words_data[BuchananFeatureNorms.SingleWordsCols.Cue]))
-
-    def distance_between(self, word_1, word_2):
-        word_1, word_2 = tuple(sorted((word_1, word_2)))
-        if word_1 not in self.available_words:
-            raise KeyError(word_1)
-        if word_2 not in self.available_words:
-            raise KeyError(word_2)
-        try:
-            return self.double_words_data.loc[
-                (self.double_words_data[BuchananFeatureNorms.DoubleWordsCols.Cue] == word_1)
-                & (self.double_words_data[BuchananFeatureNorms.DoubleWordsCols.Target] == word_2)
-                ][BuchananFeatureNorms.DoubleWordsCols.CosineRoot].values[0]
-        except IndexError:
-            # We have verified already that the word queries are good, so if the pair is missing, it has a similarity of
-            # zero
-            return 0
-
-
-sensorimotor_norms = SensorimotorNorms()
-buchanan_feature_norms = BuchananFeatureNorms()
+_sensorimotor_norms = SensorimotorNorms()
 
 
 def add_lsa_predictor(df: DataFrame, word_key_cols: Tuple[str, str], lsa_path: Path) -> DataFrame:
@@ -262,7 +164,7 @@ def add_norms_overlap_predictor(df: DataFrame, word_key_cols: Tuple[str, str]):
         i += 1
         print_progress(i, n, prefix=f"Buchanan overlap: ", bar_length=200)
         try:
-            return buchanan_feature_norms.distance_between(row[key_col_1], row[key_col_2])
+            return BUCHANAN_FEATURE_NORMS.distance_between(row[key_col_1], row[key_col_2])
         except KeyError:
             return None
 
@@ -305,8 +207,8 @@ def add_sensorimotor_predictor(df: DataFrame, word_key_cols: Tuple[str, str], di
         i += 1
         print_progress(i, n, prefix=f"Sensorimotor {distance_type.name}: ", bar_length=200)
         try:
-            v1 = sensorimotor_norms.vector_for_word(row[key_col_1])
-            v2 = sensorimotor_norms.vector_for_word(row[key_col_2])
+            v1 = _sensorimotor_norms.vector_for_word(row[key_col_1])
+            v2 = _sensorimotor_norms.vector_for_word(row[key_col_2])
             return distance(v1, v2, distance_type=distance_type)
         except WordNotInNormsError:
             return None

@@ -1,149 +1,29 @@
 from pathlib import Path
-from random import seed
 
-from nltk.corpus import wordnet, wordnet_ic
-from nltk.corpus.reader import NOUN
-from numpy import dot, array, transpose, corrcoef, exp, zeros, fill_diagonal, searchsorted, ix_
-from numpy.random import permutation
+from numpy import dot, array, transpose, corrcoef, fill_diagonal, ix_
 from pandas import read_csv
 from scipy.io import loadmat
 from scipy.spatial import distance_matrix
 from scipy.spatial.distance import squareform
-from scipy.stats import percentileofscore
 from sklearn.metrics.pairwise import cosine_distances
 
-# from linguistic_distributional_models.utils.logging import print_progress
-from predictors import BuchananFeatureNorms, WordnetAssociation
+from predictors.aux import find_indices, hebart_dir
+from predictors.rsa import randomisation_p, mean_softmax_prob_matrix, compute_wordnet_sm, compute_lsa_sm, \
+    compute_buchanan_sm
 from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
 
-seed(4)
-
-brown_ic = wordnet_ic.ic('ic-brown.dat')
-
-data_dir = Path(Path(__file__).parent, "data", "hebart")
-lsa_dir = Path(Path(__file__).parent, "data", "LSA")
 n_perms = 10_000
-
-
-def mean_softmax_prob_matrix(all_words, full_similarity_matrix, select_words=None):
-    """
-    Converts a similarity matrix on a set of conditions to a probability-of-most-similar matrix on a subset of those
-    conditions.
-    Uses mean softmax probability over triplets of the *selected* conditions containing the given pair.
-    Ported from Hebart's Matlab code.
-    """
-    if select_words is None:
-        select_words = all_words
-    n_all_conditions = len(all_words)
-    n_subset_conditions = len(select_words)
-    # Thanks to https://stackoverflow.com/a/33678576/2883198
-    word_positions_selected = find_indices(all_words, select_words)
-    # Make sure we're not missing any conditions
-    assert len(word_positions_selected) == n_subset_conditions
-
-    e_similarity_matrix = exp(full_similarity_matrix)
-    cp = zeros((n_all_conditions, n_all_conditions))
-    # Hebart et al.'s original code builds the entire matrix for all conditions, then selects out the relevant
-    # entries. We can hugely speed up this process by only computing the entries we'll eventually select out.
-    for i in word_positions_selected:
-        # print_progress(i, n_all_conditions, prefix=prefix)
-        for j in word_positions_selected:
-            if i == j: continue
-            ctmp = zeros((1, n_all_conditions))
-            for k in word_positions_selected:
-                # Only interested in distinct triplets
-                if (k == i) or (k == j):
-                    continue
-                ctmp[0, k] = (
-                        e_similarity_matrix[i, j]
-                        / (
-                                e_similarity_matrix[i, j]
-                                + e_similarity_matrix[i, k]
-                                + e_similarity_matrix[j, k]
-                        ))
-            cp[i, j] = ctmp.sum()
-    # print_progress(n_all_conditions, n_all_conditions, prefix=prefix)
-    # Complete average
-    cp /= n_subset_conditions
-    # Fill in the rest of the symmetric similarity matrix
-    # cp += transpose(cp)  # No longer need to do this now we're filling in both sides of the matrix in the above loop
-    # Instead we fix rounding errors by forcing symmetry
-    cp += transpose(cp); cp /= 2
-    fill_diagonal(cp, 1)
-    # Select out words of interest
-    selected_similarities = cp[ix_(word_positions_selected, word_positions_selected)]
-    return selected_similarities
-
-
-def find_indices(super_list, sub_list):
-    """Finds indices of all elements of sub_list in super_list"""
-    for sub in sub_list:
-        assert sub in super_list
-    sort_idx = array(super_list).argsort()
-    word_positions_selected = sort_idx[searchsorted(super_list, sub_list, sorter=sort_idx)]
-    return word_positions_selected
-
-
-# Compute a p-value by randomisation test
-def randomisation_p(rdm_1, rdm_2, observed_r, n_perms):
-    r_perms = zeros(n_perms)
-    c1 = squareform(rdm_1)
-    for perm_i in range(n_perms):
-        # if perm_i % 1000 == 0: print(perm_i)
-        perm = permutation(rdm_1.shape[0])
-        r_perms[perm_i] = corrcoef(
-            c1,
-            squareform(rdm_2[ix_(perm, perm)])
-        )[0, 1]
-    p_value = 1 - (percentileofscore(r_perms, observed_r) / 100)
-    return p_value
-
-
-def compute_wordnet_sm(words):
-    n_words = len(words)
-    similarity_matrix = zeros((n_words, n_words))
-    for i in range(n_words):
-        for j in range(n_words):
-            similarity_matrix[i, j] = WordnetAssociation.Resnik.association_between(
-                word_1=words[i], word_1_pos=NOUN,
-                word_2=words[j], word_2_pos=NOUN)
-    fill_diagonal(similarity_matrix, 1)
-    return similarity_matrix
-
-
-def compute_lsa_sm(words):
-    similarity_matrix_df = read_csv(Path(lsa_dir, "hebart48-lsa.csv"), header=0, index_col=0)
-    assert similarity_matrix_df.columns.to_list() == words
-    words_present = similarity_matrix_df.columns[~ similarity_matrix_df.isna().all()].to_list()
-    similarity_matrix = similarity_matrix_df[words_present].loc[words_present].to_numpy(dtype=float)
-    return similarity_matrix, words_present
-
-
-def compute_buchanan_sm(words):
-    b = BuchananFeatureNorms()
-    words_present = [
-        word
-        for word in words
-        if word in b.available_words
-    ]
-    n_words = len(words_present)
-    similarity_matrix = zeros((n_words, n_words))
-    for i in range(n_words):
-        for j in range(n_words):
-            similarity_matrix[i, j] = b.distance_between(words_present[i], words_present[j])
-    fill_diagonal(similarity_matrix, 1)
-    return similarity_matrix, words_present
 
 
 def main():
     # region Loading and preparing data
 
     # words and indices
-    words = [w[0][0] for w in loadmat(Path(data_dir, "words.mat"))["words"]]
-    words48 = [w[0][0] for w in loadmat(Path(data_dir, "words48.mat"))["words48"]]
+    words = [w[0][0] for w in loadmat(Path(hebart_dir, "words.mat"))["words"]]
+    words48 = [w[0][0] for w in loadmat(Path(hebart_dir, "words48.mat"))["words48"]]
 
     # Full embedding and RDM
-    with Path(data_dir, "spose_embedding_49d_sorted.txt").open() as spose_49_sorted_file:
+    with Path(hebart_dir, "spose_embedding_49d_sorted.txt").open() as spose_49_sorted_file:
         embedding_49: array = read_csv(spose_49_sorted_file, skip_blank_lines=True, header=None, delimiter=" ").to_numpy()[:, :49]
 
     # Full similarity matrices
@@ -152,7 +32,7 @@ def main():
     dot_product_49_bottom_11 = dot(embedding_49[:, -11:], transpose(embedding_49[:, -11:]))
 
     # 48-object participant RDM
-    rdm48_participant = loadmat(Path(data_dir, "RDM48_triplet.mat"))["RDM48_triplet"]
+    rdm48_participant = loadmat(Path(hebart_dir, "RDM48_triplet.mat"))["RDM48_triplet"]
 
     # endregion
 
@@ -161,6 +41,7 @@ def main():
     subset = True
 
     buchanan_sm, words18_buchanan = compute_buchanan_sm(words=words48)
+    print(words18_buchanan)
     words18_idxs = find_indices(words48, words18_buchanan)
     rdm18_participant = rdm48_participant[ix_(words18_idxs, words18_idxs)]
     buchanan_sim18 = mean_softmax_prob_matrix(all_words=words18_buchanan, full_similarity_matrix=buchanan_sm)
