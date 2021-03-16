@@ -13,7 +13,7 @@ from scipy.stats import percentileofscore
 from sklearn.metrics.pairwise import cosine_distances
 
 # from linguistic_distributional_models.utils.logging import print_progress
-from predictors import BuchananFeatureNorms
+from predictors import BuchananFeatureNorms, WordnetAssociation
 from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
 
 seed(4)
@@ -99,23 +99,14 @@ def randomisation_p(rdm_1, rdm_2, observed_r, n_perms):
     return p_value
 
 
-def wordnet_similarity(word_1, word_2):
-    synsets1 = wordnet.synsets(word_1, pos=NOUN)
-    synsets2 = wordnet.synsets(word_2, pos=NOUN)
-    max_similarity = 0
-    for s1 in synsets1:
-        for s2 in synsets2:
-            similarity = s1.res_similarity(s2, brown_ic)
-            max_similarity = max(max_similarity, similarity)
-    return max_similarity
-
-
 def compute_wordnet_sm(words):
     n_words = len(words)
     similarity_matrix = zeros((n_words, n_words))
     for i in range(n_words):
         for j in range(n_words):
-            similarity_matrix[i, j] = wordnet_similarity(words[i], words[j])
+            similarity_matrix[i, j] = WordnetAssociation.Resnik.association_between(
+                word_1=words[i], word_1_pos=NOUN,
+                word_2=words[j], word_2_pos=NOUN)
     fill_diagonal(similarity_matrix, 1)
     return similarity_matrix
 

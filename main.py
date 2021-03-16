@@ -6,7 +6,7 @@ from pandas import DataFrame
 
 from aux import logger, logger_format, logger_dateformat
 from linguistic_distributional_models.utils.maths import DistanceType
-from predictors import add_wordnet_predictor, WordnetDistance, add_lsa_predictor, add_norms_overlap_predictor, \
+from predictors import add_wordnet_predictor, WordnetAssociation, add_lsa_predictor, add_norms_overlap_predictor, \
     add_sensorimotor_predictor
 from linguistic_distributional_models.evaluation.association import WordsimAll, WordAssociationTest, SimlexSimilarity, \
     MenSimilarity
@@ -25,7 +25,7 @@ def common_similarity_modelling(df: DataFrame,
         df,
         word_key_cols=word_key_cols,
         pos_path=pos_path,
-        distance_type=WordnetDistance.JCN)
+        association_type=WordnetAssociation.JCN)
     df = add_lsa_predictor(
         df,
         word_key_cols=word_key_cols,

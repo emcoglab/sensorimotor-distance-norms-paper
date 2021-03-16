@@ -14,6 +14,63 @@ from linguistic_distributional_models.utils.maths import distance, DistanceType
 from sensorimotor_norms.exceptions import WordNotInNormsError
 from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
 
+_brown_ic = wordnet_ic.ic('ic-brown.dat')
+
+
+class WordnetAssociation(Enum):
+    """Representative of a type of Wordnet distance."""
+
+    JCN = auto()  # JCN distance a la Maki et al. (2004)
+    Resnik = auto()  # Resnik similarity
+
+    @property
+    def name(self):
+        if self == self.JCN:
+            return "Jiang-Coranth"
+        if self == self.Resnik:
+            return "Resnik"
+        raise NotImplementedError()
+
+    def association_between(self, word_1, word_2, word_1_pos, word_2_pos) -> Optional[float]:
+        """
+        :param word_1, word_2: The words
+        :param word_1_pos, word_2_pos: The words' respective parts of speech tags
+        :return: The association value, or None if at least one of the words wasn't available.
+        """
+        try:
+            synsets_1 = wordnet.synsets(word_1, pos=word_1_pos)
+            synsets_2 = wordnet.synsets(word_2, pos=word_2_pos)
+
+            if self == self.Resnik:
+                max_similarity = 0
+                for s1 in synsets_1:
+                    for s2 in synsets_2:
+                        max_similarity = max(max_similarity, s1.res_similarity(s2, _brown_ic))
+                return max_similarity
+
+            if self == self.JCN:
+                minimum_jcn_distance = inf
+                for s1 in synsets_1:
+                    for s2 in synsets_2:
+                        try:
+                            minimum_jcn_distance = min(
+                                minimum_jcn_distance,
+                                # Match the formula of Maki et al. (2004)
+                                1 / s1.jcn_similarity(s2, _brown_ic))
+                        except WordNetError:
+                            continue  # Skip incomparable pairs
+                        except ZeroDivisionError:
+                            continue  # Similarity was zero
+                # Catch cases where we're still at inf
+                if minimum_jcn_distance >= 100_000:
+                    return None
+                return minimum_jcn_distance
+
+            raise NotImplementedError()
+
+        except WordNetError:
+            return None
+
 
 class BuchananFeatureNorms:
 
@@ -91,19 +148,10 @@ def add_lsa_predictor(df: DataFrame, word_key_cols: Tuple[str, str], lsa_path: P
     return df
 
 
-class WordnetDistance(Enum):
-    """Representative of a type of Wordnet distance."""
-    JCN = auto()
-
-    @property
-    def name(self):
-        if self == self.JCN:
-            return "Jiang-Coranth"
-        raise NotImplementedError()
-
-
-def add_wordnet_predictor(df: DataFrame, word_key_cols: Tuple[str, str], pos_path: Optional[Path],
-                          distance_type: WordnetDistance):
+def add_wordnet_predictor(df: DataFrame,
+                          word_key_cols: Tuple[str, str],
+                          pos_path: Optional[Path],
+                          association_type: WordnetAssociation):
     """
     Adds a column of Wordnet distance predictor to the supplied dataframe.
 
@@ -114,13 +162,13 @@ def add_wordnet_predictor(df: DataFrame, word_key_cols: Tuple[str, str], pos_pat
         will be computed.
     :param pos_path:
         Path to a two-column tab-separated file containing a row for each word and elexicon-coded POS tags.
-    :param distance_type:
-        Which type of wordnet distance to use
+    :param association_type:
+        Which type of wordnet association to use
     :return:
         `df` with the appropriately named wordneet distance column added.
         If the column already existed in `df`, nothing new will be added.
     """
-    _predictor_name = f"WordNet distance ({distance_type.name})"
+    _predictor_name = f"WordNet association ({association_type.name})"
 
     if _predictor_name in df.columns:
         logger.info("Predictor already exists, skipping")
@@ -166,37 +214,16 @@ def add_wordnet_predictor(df: DataFrame, word_key_cols: Tuple[str, str], pos_pat
     def calc_jcn_distance(row):
         nonlocal i
         i += 1
-        print_progress(i, n, prefix=f"WordNet {distance_type.name}: ", bar_length=200)
+        print_progress(i, n, prefix=f"WordNet {association_type.name}: ", bar_length=200)
 
         # Get words
         w1 = row[key_col_1]
         w2 = row[key_col_2]
 
-        # Get POS
-        pos_1 = get_pos(w1)
-        pos_2 = get_pos(w2)
-
-        # Get JCN
-        try:
-            synsets1 = wordnet.synsets(w1, pos=pos_1)
-            synsets2 = wordnet.synsets(w2, pos=pos_2)
-        except WordNetError:
-            return None
-        minimum_jcn_distance = inf
-        for synset1 in synsets1:
-            for synset2 in synsets2:
-                try:
-                    jcn = 1 / synset1.jcn_similarity(synset2, brown_ic)  # Match the formula of Maki et al. (2004)
-                    minimum_jcn_distance = min(minimum_jcn_distance, jcn)
-                except WordNetError:
-                    # Skip incomparable pairs
-                    continue
-                except ZeroDivisionError:
-                    # Similarity was zero/distance was infinite
-                    continue
-        if minimum_jcn_distance >= 1_000:
-            return None
-        return minimum_jcn_distance
+        return WordnetAssociation.JCN.association_between(
+            word_1=w1, word_1_pos=get_pos(w1),
+            word_2=w2, word_2_pos=get_pos(w2),
+        )
 
     # noinspection PyTypeChecker
     df[_predictor_name] = df.apply(calc_jcn_distance, axis=1)
