@@ -27,6 +27,11 @@ class LabelledSymmetricMatrix:
         self.labels: List[str] = labels
 
         assert len(labels) == matrix.shape[0] == matrix.shape[1]
+        assert (matrix == transpose(matrix)).all()
+
+    @property
+    def triangular_values(self) -> array:
+        return squareform(self.matrix, checks=False)
 
     def for_subset(self, subset_words: List[str]) -> LabelledSymmetricMatrix:
         idxs = find_indices(self.labels, subset_words)

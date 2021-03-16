@@ -94,8 +94,27 @@ def model_men(location: Path, overwrite: bool) -> None:
         save_path=save_path)
 
 
-def model_hebart(location: Path, n_perms: int):
-    save_path = Path(location, "hebart_results.csv")
+def save_raw_values(reference_rdm: RDM, comparison_rdm: RDM, save_path: Path, overwrite: bool):
+    assert reference_rdm.labels == comparison_rdm.labels
+
+    if save_path.exists() and not overwrite:
+        logger.warning(f"{save_path} exists, skipping")
+        return
+
+    with save_path.open("w") as save_file:
+        DataFrame.from_dict({
+            "Reference RDM values": reference_rdm.triangular_values,
+            "Comparison RDM values": comparison_rdm.triangular_values,
+        }).to_csv(save_file, header=True, index=False)
+
+
+def model_hebart(location: Path, overwrite: bool, n_perms: int):
+    save_dir = Path(location, "hebart")
+    results_path = Path(location, "hebart_results.csv")
+
+    if results_path.exists() and not overwrite:
+        logger.warning(f"{results_path} exists, skipping")
+        return
 
     logger.info(f"Hebart modelling ({n_perms:,} permutations)")
 
@@ -116,6 +135,12 @@ def model_hebart(location: Path, n_perms: int):
         ("Participants", "SPOSE bottom-11", 48, *rdm_participants.correlate_with_nhst(rdm_spose_bottom11, n_perms=n_perms)),
         ("Participants", "SPOSE bottom-11", 18, *rdm_participants.for_subset(SPOSE.words_common_18).correlate_with_nhst(rdm_spose_bottom11.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
     ])
+    save_raw_values(rdm_participants, rdm_spose, Path(save_dir, "spose.csv"), overwrite)
+    save_raw_values(rdm_participants.for_subset(SPOSE.words_common_18), rdm_spose.for_subset(SPOSE.words_common_18), Path(save_dir, "spose_common18.csv"), overwrite)
+    save_raw_values(rdm_participants, rdm_spose_top11, Path(save_dir, "spose_top11.csv"), overwrite)
+    save_raw_values(rdm_participants.for_subset(SPOSE.words_common_18), rdm_spose_top11.for_subset(SPOSE.words_common_18), Path(save_dir, "spose_top11_common18.csv"), overwrite)
+    save_raw_values(rdm_participants, rdm_spose_bottom11, Path(save_dir, "spose_bottom11.csv"), overwrite)
+    save_raw_values(rdm_participants.for_subset(SPOSE.words_common_18), rdm_spose_bottom11.for_subset(SPOSE.words_common_18), Path(save_dir, "spose_bottom11_common18.csv"), overwrite)
 
     # LSA
     rdm_lsa = RDM.from_similarity_matrix(SimilarityMatrix.mean_softmax_probability_matrix(compute_lsa_sm(), SPOSE.words_lsa_46))
@@ -123,6 +148,8 @@ def model_hebart(location: Path, n_perms: int):
         ("Participants", "LSA softmax", 46, *rdm_participants.for_subset(SPOSE.words_lsa_46).correlate_with_nhst(rdm_lsa, n_perms=n_perms)),
         ("Participants", "LSA softmax", 18, *rdm_participants.for_subset(SPOSE.words_common_18).correlate_with_nhst(rdm_lsa.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
     ])
+    save_raw_values(rdm_participants.for_subset(SPOSE.words_lsa_46), rdm_lsa, Path(save_dir, "lsa.csv"), overwrite)
+    save_raw_values(rdm_participants.for_subset(SPOSE.words_common_18), rdm_lsa.for_subset(SPOSE.words_common_18), Path(save_dir, "lsa_common18.csv"), overwrite)
 
     # Wordnet
     wordnet_association = WordnetAssociation.Resnik
@@ -131,12 +158,15 @@ def model_hebart(location: Path, n_perms: int):
         ("Participants", f"Wordnet {wordnet_association.name}", 48, *rdm_participants.correlate_with_nhst(rdm_wordnet, n_perms=n_perms)),
         ("Participants", f"Wordnet {wordnet_association.name}", 18, *rdm_participants.for_subset(SPOSE.words_common_18).correlate_with_nhst(rdm_wordnet.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
     ])
+    save_raw_values(rdm_participants, rdm_wordnet, Path(save_dir, "wordnet.csv"), overwrite)
+    save_raw_values(rdm_participants.for_subset(SPOSE.words_common_18), rdm_wordnet.for_subset(SPOSE.words_common_18), Path(save_dir, "wordnet_common18.csv"), overwrite)
 
     # Buchanan
     rdm_buchanan = RDM.from_similarity_matrix(SimilarityMatrix.mean_softmax_probability_matrix(compute_buchanan_sm(), SPOSE.words_common_18))
     results.extend([
         ("Participants", "Buchanan feature overlap", 18, *rdm_participants.for_subset(SPOSE.words_common_18).correlate_with_nhst(rdm_buchanan, n_perms=n_perms))
     ])
+    save_raw_values(rdm_participants.for_subset(SPOSE.words_common_18), rdm_buchanan, Path(save_dir, "buchanan_common18.csv"), overwrite)
 
     # Sensorimotor
     sensorimotor_distance = DistanceType.cosine
@@ -145,8 +175,10 @@ def model_hebart(location: Path, n_perms: int):
         ("Participants", f"Sensorimotor {sensorimotor_distance.name}", 48, *rdm_participants.correlate_with_nhst(rdm_sensorimotor, n_perms=n_perms)),
         ("Participants", f"Sensorimotor {sensorimotor_distance.name}", 18, *rdm_participants.for_subset(SPOSE.words_common_18).correlate_with_nhst(rdm_sensorimotor.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
     ])
+    save_raw_values(rdm_participants, rdm_sensorimotor, Path(save_dir, "sensorimotor.csv"), overwrite)
+    save_raw_values(rdm_participants.for_subset(SPOSE.words_common_18), rdm_sensorimotor.for_subset(SPOSE.words_common_18), Path(save_dir, "sensorimotor_common18.csv"), overwrite)
 
-    with save_path.open("w") as save_file:
+    with results_path.open("w") as save_file:
         DataFrame.from_records(
             results,
             columns=[
@@ -171,6 +203,6 @@ if __name__ == '__main__':
     model_wordsim(location=save_dir, overwrite=overwrite)
     model_simlex(location=save_dir, overwrite=overwrite)
     model_men(location=save_dir, overwrite=overwrite)
-    model_hebart(location=save_dir, n_perms=n_perms)
+    model_hebart(location=save_dir, overwrite=overwrite, n_perms=n_perms)
 
     logger.info("Done!")
