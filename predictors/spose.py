@@ -4,7 +4,7 @@ from numpy import array
 from pandas import read_csv
 from scipy.io import loadmat
 
-from aux import hebart_dir
+from .aux import hebart_dir
 
 
 class Spose:

@@ -9,10 +9,10 @@ from linguistic_distributional_models.utils.logging import print_progress
 from linguistic_distributional_models.utils.maths import distance, DistanceType
 from sensorimotor_norms.exceptions import WordNotInNormsError
 from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
-from aux import logger
-from wordnet import elex_to_wordnet
-from buchanan import BUCHANAN_FEATURE_NORMS
-from wordnet import WordnetAssociation
+from .aux import logger
+from .wordnet import elex_to_wordnet
+from .buchanan import BUCHANAN_FEATURE_NORMS
+from .wordnet import WordnetAssociation
 
 _sensorimotor_norms = SensorimotorNorms()
 

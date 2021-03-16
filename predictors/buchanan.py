@@ -3,7 +3,7 @@ from typing import List
 
 from pandas import DataFrame, read_csv
 
-from aux import buchanan_dir
+from .aux import buchanan_dir
 
 
 class BuchananFeatureNorms:

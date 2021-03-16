@@ -13,11 +13,12 @@ from scipy.spatial.distance import squareform
 from scipy.stats import percentileofscore
 from sklearn.metrics.pairwise import cosine_distances
 
-from aux import find_indices, lsa_dir
-from buchanan import BUCHANAN_FEATURE_NORMS
+from linguistic_distributional_models.utils.maths import DistanceType
 from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
-from spose import SPOSE
-from wordnet import WordnetAssociation
+from .aux import find_indices, lsa_dir
+from .buchanan import BUCHANAN_FEATURE_NORMS
+from .spose import SPOSE
+from .wordnet import WordnetAssociation
 
 
 class LabelledSymmetricMatrix:
