@@ -97,7 +97,7 @@ def model_men(location: Path, overwrite: bool) -> None:
 def model_hebart(location: Path, n_perms: int):
     save_path = Path(location, "hebart_results.csv")
 
-    logger.info(f"Hebart modelling ({n_perms} permutations)")
+    logger.info(f"Hebart modelling ({n_perms:,} permutations)")
 
     results = []
 
@@ -154,7 +154,7 @@ def model_hebart(location: Path, n_perms: int):
                 "Comparison RH",
                 "N conditions",
                 "R-value",
-                f"P-value ({n_perms} permutations)",
+                f"P-value ({n_perms:_} permutations)",
             ]
         ).to_csv(save_file, header=True, index=False)
 
