@@ -3,6 +3,7 @@ __pycache__/
 venv/
 !data/hebart
 data/hebart/*
+!data/hebart/words48.txt
 !data/hebart/words18common.txt
 !data/hebart/words46lsa.txt
 data/buchanan/
