@@ -14,7 +14,7 @@ from predictors.spose import SPOSE
 from predictors.predictors import add_wordnet_predictor, add_lsa_predictor, add_norms_overlap_predictor, \
     add_sensorimotor_predictor
 from predictors.rsa import compute_buchanan_sm, RDM, SimilarityMatrix, compute_lsa_sm, compute_wordnet_sm, \
-    compute_sensorimotor_rdm
+    compute_sensorimotor_rdm, subset_flag
 from predictors.wordnet import WordnetAssociation
 
 
@@ -105,6 +105,7 @@ def save_raw_values(reference_rdm: RDM, comparison_rdm: RDM, save_path: Path, ov
         DataFrame.from_dict({
             "Reference RDM values": reference_rdm.triangular_values,
             "Comparison RDM values": comparison_rdm.triangular_values,
+            "In common 18": subset_flag(reference_rdm, subset_labels=SPOSE.words_common_18).triangular_values,
         }).to_csv(save_file, header=True, index=False)
 
 
@@ -136,11 +137,8 @@ def model_hebart(location: Path, overwrite: bool, n_perms: int):
         ("Participants", "SPOSE bottom-11", 18, *rdm_participants.for_subset(SPOSE.words_common_18).correlate_with_nhst(rdm_spose_bottom11.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
     ])
     save_raw_values(rdm_participants, rdm_spose, Path(save_dir, "spose.csv"), overwrite)
-    save_raw_values(rdm_participants.for_subset(SPOSE.words_common_18), rdm_spose.for_subset(SPOSE.words_common_18), Path(save_dir, "spose_common18.csv"), overwrite)
     save_raw_values(rdm_participants, rdm_spose_top11, Path(save_dir, "spose_top11.csv"), overwrite)
-    save_raw_values(rdm_participants.for_subset(SPOSE.words_common_18), rdm_spose_top11.for_subset(SPOSE.words_common_18), Path(save_dir, "spose_top11_common18.csv"), overwrite)
     save_raw_values(rdm_participants, rdm_spose_bottom11, Path(save_dir, "spose_bottom11.csv"), overwrite)
-    save_raw_values(rdm_participants.for_subset(SPOSE.words_common_18), rdm_spose_bottom11.for_subset(SPOSE.words_common_18), Path(save_dir, "spose_bottom11_common18.csv"), overwrite)
 
     # LSA
     rdm_lsa = RDM.from_similarity_matrix(SimilarityMatrix.mean_softmax_probability_matrix(compute_lsa_sm(), SPOSE.words_lsa_46))
@@ -149,7 +147,6 @@ def model_hebart(location: Path, overwrite: bool, n_perms: int):
         ("Participants", "LSA softmax", 18, *rdm_participants.for_subset(SPOSE.words_common_18).correlate_with_nhst(rdm_lsa.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
     ])
     save_raw_values(rdm_participants.for_subset(SPOSE.words_lsa_46), rdm_lsa, Path(save_dir, "lsa.csv"), overwrite)
-    save_raw_values(rdm_participants.for_subset(SPOSE.words_common_18), rdm_lsa.for_subset(SPOSE.words_common_18), Path(save_dir, "lsa_common18.csv"), overwrite)
 
     # Wordnet
     wordnet_association = WordnetAssociation.Resnik
@@ -159,14 +156,13 @@ def model_hebart(location: Path, overwrite: bool, n_perms: int):
         ("Participants", f"Wordnet {wordnet_association.name}", 18, *rdm_participants.for_subset(SPOSE.words_common_18).correlate_with_nhst(rdm_wordnet.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
     ])
     save_raw_values(rdm_participants, rdm_wordnet, Path(save_dir, "wordnet.csv"), overwrite)
-    save_raw_values(rdm_participants.for_subset(SPOSE.words_common_18), rdm_wordnet.for_subset(SPOSE.words_common_18), Path(save_dir, "wordnet_common18.csv"), overwrite)
 
     # Buchanan
     rdm_buchanan = RDM.from_similarity_matrix(SimilarityMatrix.mean_softmax_probability_matrix(compute_buchanan_sm(), SPOSE.words_common_18))
     results.extend([
         ("Participants", "Buchanan feature overlap", 18, *rdm_participants.for_subset(SPOSE.words_common_18).correlate_with_nhst(rdm_buchanan, n_perms=n_perms))
     ])
-    save_raw_values(rdm_participants.for_subset(SPOSE.words_common_18), rdm_buchanan, Path(save_dir, "buchanan_common18.csv"), overwrite)
+    save_raw_values(rdm_participants.for_subset(SPOSE.words_common_18), rdm_buchanan, Path(save_dir, "buchanan.csv"), overwrite)
 
     # Sensorimotor
     sensorimotor_distance = DistanceType.cosine
@@ -176,7 +172,6 @@ def model_hebart(location: Path, overwrite: bool, n_perms: int):
         ("Participants", f"Sensorimotor {sensorimotor_distance.name}", 18, *rdm_participants.for_subset(SPOSE.words_common_18).correlate_with_nhst(rdm_sensorimotor.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
     ])
     save_raw_values(rdm_participants, rdm_sensorimotor, Path(save_dir, "sensorimotor.csv"), overwrite)
-    save_raw_values(rdm_participants.for_subset(SPOSE.words_common_18), rdm_sensorimotor.for_subset(SPOSE.words_common_18), Path(save_dir, "sensorimotor_common18.csv"), overwrite)
 
     with results_path.open("w") as save_file:
         DataFrame.from_records(

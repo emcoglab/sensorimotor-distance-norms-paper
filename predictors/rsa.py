@@ -190,3 +190,18 @@ def compute_sensorimotor_rdm(distance_type) -> RDM:
         raise NotImplementedError()
 
     return RDM(matrix=rdm, labels=SPOSE.words_select_48)
+
+
+def subset_flag(reference_rdm, subset_labels) -> SimilarityMatrix:
+    """
+    Given a subset of labels, returns a similarity matrix whose entries are True where both row and column labels are
+    within the subset and otherwise False.
+
+    :param reference_rdm:
+    :param subset_labels:
+    :return:
+    """
+    flag = zeros((len(reference_rdm.labels), len(reference_rdm.labels)), dtype=bool)
+    idxs = find_indices(reference_rdm.labels, subset_labels)
+    flag[ix_(idxs, idxs)] = True
+    return SimilarityMatrix(matrix=flag, labels=reference_rdm.labels)
