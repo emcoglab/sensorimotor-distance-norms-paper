@@ -13,7 +13,7 @@ from scipy.stats import percentileofscore
 from sklearn.metrics.pairwise import cosine_distances
 
 # from linguistic_distributional_models.utils.logging import print_progress
-from buchanan_norms import BuchananFeatureNorms
+from predictors import BuchananFeatureNorms
 from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
 
 seed(4)
