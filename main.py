@@ -97,6 +97,8 @@ def model_men(location: Path, overwrite: bool) -> None:
 def model_hebart(location: Path, n_perms: int):
     save_path = Path(location, "hebart_results.csv")
 
+    logger.info(f"Hebart modelling ({n_perms} permutations)")
+
     results = []
 
     # Reference RDM
@@ -152,7 +154,7 @@ def model_hebart(location: Path, n_perms: int):
                 "Comparison RH",
                 "N conditions",
                 "R-value",
-                "P-value",
+                f"P-value ({n_perms} permutations)",
             ]
         ).to_csv(save_file, header=True, index=False)
 
@@ -163,8 +165,8 @@ if __name__ == '__main__':
     seed(1)
 
     save_dir = Path("/Users/caiwingfield/Resilio Sync/Lancaster/Sensorimotor distance paper/Output/")
-    overwrite = False
-    n_perms = 10_000
+    overwrite = True
+    n_perms = 100_000
 
     model_wordsim(location=save_dir, overwrite=overwrite)
     model_simlex(location=save_dir, overwrite=overwrite)
