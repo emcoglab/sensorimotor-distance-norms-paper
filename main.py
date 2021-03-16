@@ -13,7 +13,8 @@ from predictors.aux import logger, logger_format, logger_dateformat, pos_dir, ls
 from predictors.spose import SPOSE
 from predictors.predictors import add_wordnet_predictor, add_lsa_predictor, add_norms_overlap_predictor, \
     add_sensorimotor_predictor
-from predictors.rsa import compute_buchanan_sm, RDM, SimilarityMatrix, randomisation_p, compute_lsa_sm
+from predictors.rsa import compute_buchanan_sm, RDM, SimilarityMatrix, compute_lsa_sm, compute_wordnet_sm, \
+    compute_sensorimotor_rdm
 from predictors.wordnet import WordnetAssociation
 
 
@@ -93,52 +94,67 @@ def model_men(location: Path, overwrite: bool) -> None:
         save_path=save_path)
 
 
-def model_hebart(n_perms):
+def model_hebart(location: Path, n_perms: int):
+    save_path = Path(location, "hebart_results.csv")
+
     results = []
 
     # Reference RDM
-    rdm_participants = RDM(matrix=loadmat(Path(hebart_dir, "RDM48_triplet.mat"))["RDM48_triplet"],
-                           labels=SPOSE.words_select_48)
+    rdm_participants = RDM(matrix=loadmat(Path(hebart_dir, "RDM48_triplet.mat"))["RDM48_triplet"], labels=SPOSE.words_select_48)
 
     # Hebart's embedding
     rdm_spose = RDM.from_similarity_matrix(SimilarityMatrix.mean_softmax_probability_matrix(SimilarityMatrix.by_dotproduct(data_matrix=SPOSE.matrix_49d, labels=SPOSE.words_all), subset_labels=SPOSE.words_select_48))
     rdm_spose_top11 = RDM.from_similarity_matrix(SimilarityMatrix.mean_softmax_probability_matrix(SimilarityMatrix.by_dotproduct(data_matrix=SPOSE.matrix_49d[:, :11], labels=SPOSE.words_all), subset_labels=SPOSE.words_select_48))
     rdm_spose_bottom11 = RDM.from_similarity_matrix(SimilarityMatrix.mean_softmax_probability_matrix(SimilarityMatrix.by_dotproduct(data_matrix=SPOSE.matrix_49d[:, -11:], labels=SPOSE.words_all), subset_labels=SPOSE.words_select_48))
     results.extend([
-        "Participants", "SPOSE", 48, *rdm_participants.correlate_with_nhst(rdm_spose, n_perms=n_perms),
-        "Participants", "SPOSE", 18, *rdm_participants.for_subset(SPOSE.words_common_18).correlate_with_nhst(rdm_spose.for_subset(SPOSE.words_common_18), n_perms=n_perms),
-        "Participants", "SPOSE top-11", 48, *rdm_participants.correlate_with_nhst(rdm_spose_top11, n_perms=n_perms),
-        "Participants", "SPOSE top-11", 18, *rdm_participants.for_subset(SPOSE.words_common_18).correlate_with_nhst(rdm_spose_top11.for_subset(SPOSE.words_common_18), n_perms=n_perms),
-        "Participants", "SPOSE bottom-11", 48, *rdm_participants.correlate_with_nhst(rdm_spose_bottom11, n_perms=n_perms),
-        "Participants", "SPOSE bottom-11", 18, *rdm_participants.for_subset(SPOSE.words_common_18).correlate_with_nhst(rdm_spose_bottom11.for_subset(SPOSE.words_common_18), n_perms=n_perms),
+        ("Participants", "SPOSE", 48, *rdm_participants.correlate_with_nhst(rdm_spose, n_perms=n_perms)),
+        ("Participants", "SPOSE", 18, *rdm_participants.for_subset(SPOSE.words_common_18).correlate_with_nhst(rdm_spose.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
+        ("Participants", "SPOSE top-11", 48, *rdm_participants.correlate_with_nhst(rdm_spose_top11, n_perms=n_perms)),
+        ("Participants", "SPOSE top-11", 18, *rdm_participants.for_subset(SPOSE.words_common_18).correlate_with_nhst(rdm_spose_top11.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
+        ("Participants", "SPOSE bottom-11", 48, *rdm_participants.correlate_with_nhst(rdm_spose_bottom11, n_perms=n_perms)),
+        ("Participants", "SPOSE bottom-11", 18, *rdm_participants.for_subset(SPOSE.words_common_18).correlate_with_nhst(rdm_spose_bottom11.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
     ])
 
     # LSA
     rdm_lsa = RDM.from_similarity_matrix(SimilarityMatrix.mean_softmax_probability_matrix(compute_lsa_sm(), SPOSE.words_lsa_46))
     results.extend([
-        "Participants", "LSA softmax", 46, *rdm_participants.for_subset(SPOSE.words_lsa_46).correlate_with_nhst(rdm_lsa, n_perms=n_perms),
-        "Participants", "LSA softmax", 18, *rdm_participants.for_subset(SPOSE.words_common_18).correlate_with_nhst(rdm_lsa.for_subset(SPOSE.words_common_18), n_perms=n_perms),
+        ("Participants", "LSA softmax", 46, *rdm_participants.for_subset(SPOSE.words_lsa_46).correlate_with_nhst(rdm_lsa, n_perms=n_perms)),
+        ("Participants", "LSA softmax", 18, *rdm_participants.for_subset(SPOSE.words_common_18).correlate_with_nhst(rdm_lsa.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
     ])
 
     # Wordnet
-    # TODO
+    wordnet_association = WordnetAssociation.Resnik
+    rdm_wordnet = RDM.from_similarity_matrix(SimilarityMatrix.mean_softmax_probability_matrix(compute_wordnet_sm(association_type=wordnet_association)))
+    results.extend([
+        ("Participants", f"Wordnet {wordnet_association.name}", 48, *rdm_participants.correlate_with_nhst(rdm_wordnet, n_perms=n_perms)),
+        ("Participants", f"Wordnet {wordnet_association.name}", 18, *rdm_participants.for_subset(SPOSE.words_common_18).correlate_with_nhst(rdm_wordnet.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
+    ])
 
     # Buchanan
-    # TODO
     rdm_buchanan = RDM.from_similarity_matrix(SimilarityMatrix.mean_softmax_probability_matrix(compute_buchanan_sm(), SPOSE.words_common_18))
+    results.extend([
+        ("Participants", "Buchanan feature overlap", 18, *rdm_participants.for_subset(SPOSE.words_common_18).correlate_with_nhst(rdm_buchanan, n_perms=n_perms))
+    ])
 
     # Sensorimotor
-    # TODO
+    sensorimotor_distance = DistanceType.cosine
+    rdm_sensorimotor = RDM.from_similarity_matrix(SimilarityMatrix.mean_softmax_probability_matrix(SimilarityMatrix.from_rdm(compute_sensorimotor_rdm(distance_type=sensorimotor_distance))))
+    results.extend([
+        ("Participants", f"Sensorimotor {sensorimotor_distance.name}", 48, *rdm_participants.correlate_with_nhst(rdm_sensorimotor, n_perms=n_perms)),
+        ("Participants", f"Sensorimotor {sensorimotor_distance.name}", 18, *rdm_participants.for_subset(SPOSE.words_common_18).correlate_with_nhst(rdm_sensorimotor.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
+    ])
 
-    results_df = DataFrame.from_records(
-        results,
-        columns=[
-            "Comparison LH",
-            "Comparison RH",
-            "N conditions",
-            "R-value",
-            "P-value",
-        ])
+    with save_path.open("w") as save_file:
+        DataFrame.from_records(
+            results,
+            columns=[
+                "Comparison LH",
+                "Comparison RH",
+                "N conditions",
+                "R-value",
+                "P-value",
+            ]
+        ).to_csv(save_file, header=True, index=False)
 
 
 if __name__ == '__main__':
@@ -153,6 +169,6 @@ if __name__ == '__main__':
     model_wordsim(location=save_dir, overwrite=overwrite)
     model_simlex(location=save_dir, overwrite=overwrite)
     model_men(location=save_dir, overwrite=overwrite)
-    model_hebart(n_perms=n_perms)
+    model_hebart(location=save_dir, n_perms=n_perms)
 
     logger.info("Done!")

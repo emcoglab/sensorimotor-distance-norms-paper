@@ -8,11 +8,14 @@ from nltk.corpus.reader import NOUN
 from numpy import zeros, corrcoef, ix_, exp, fill_diagonal, transpose, array, dot
 from numpy.random import permutation
 from pandas import read_csv
+from scipy.spatial import distance_matrix
 from scipy.spatial.distance import squareform
 from scipy.stats import percentileofscore
+from sklearn.metrics.pairwise import cosine_distances
 
 from aux import find_indices, lsa_dir
 from buchanan import BUCHANAN_FEATURE_NORMS
+from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
 from spose import SPOSE
 from wordnet import WordnetAssociation
 
@@ -37,6 +40,14 @@ class LabelledSymmetricMatrix:
 
 
 class SimilarityMatrix(LabelledSymmetricMatrix):
+
+    def for_subset(self, subset_words: List[str]) -> SimilarityMatrix:
+        s = super().for_subset(subset_words)
+        return SimilarityMatrix(
+            matrix=s.matrix,
+            labels=s.labels
+        )
+
     @classmethod
     def by_dotproduct(cls, data_matrix: array, labels: List[str]) -> SimilarityMatrix:
         return cls(
@@ -93,6 +104,13 @@ class SimilarityMatrix(LabelledSymmetricMatrix):
 
 class RDM(LabelledSymmetricMatrix):
 
+    def for_subset(self, subset_words: List[str]) -> RDM:
+        s = super().for_subset(subset_words)
+        return RDM(
+            matrix=s.matrix,
+            labels=s.labels
+        )
+
     @staticmethod
     def from_similarity_matrix(similarity_matrix: SimilarityMatrix) -> RDM:
         return RDM(matrix=1 - similarity_matrix.matrix, labels=similarity_matrix.labels)
@@ -128,22 +146,22 @@ def randomisation_p(rdm_1, rdm_2, observed_r, n_perms):
     return p_value
 
 
-def compute_wordnet_sm(words):
-    n_words = len(words)
+def compute_wordnet_sm(association_type: WordnetAssociation):
+    n_words = len(SPOSE.words_select_48)
     similarity_matrix = zeros((n_words, n_words))
     for i in range(n_words):
         for j in range(n_words):
-            similarity_matrix[i, j] = WordnetAssociation.Resnik.association_between(
-                word_1=words[i], word_1_pos=NOUN,
-                word_2=words[j], word_2_pos=NOUN)
+            similarity_matrix[i, j] = association_type.association_between(
+                word_1=SPOSE.words_select_48[i], word_1_pos=NOUN,
+                word_2=SPOSE.words_select_48[j], word_2_pos=NOUN)
     fill_diagonal(similarity_matrix, 1)
-    return similarity_matrix
+    return SimilarityMatrix(matrix=similarity_matrix, labels=SPOSE.words_select_48)
 
 
 def compute_lsa_sm():
     similarity_matrix_df = read_csv(Path(lsa_dir, "hebart48-lsa.csv"), header=0, index_col=0)
     similarity_matrix = similarity_matrix_df[SPOSE.words_lsa_46].loc[SPOSE.words_lsa_46].to_numpy(dtype=float)
-    return similarity_matrix
+    return SimilarityMatrix(matrix=similarity_matrix, labels=SPOSE.words_lsa_46)
 
 
 def compute_buchanan_sm():
@@ -153,4 +171,16 @@ def compute_buchanan_sm():
         for j in range(n_words):
             similarity_matrix[i, j] = BUCHANAN_FEATURE_NORMS.distance_between(SPOSE.words_common_18[i], SPOSE.words_common_18[j])
     fill_diagonal(similarity_matrix, 1)
-    return similarity_matrix
+    return SimilarityMatrix(matrix=similarity_matrix, labels=SPOSE.words_common_18)
+
+
+def compute_sensorimotor_rdm(distance_type) -> RDM:
+    sm_data = SensorimotorNorms().matrix_for_words(SPOSE.words_select_48)
+    if distance_type == DistanceType.cosine:
+        rdm = cosine_distances(sm_data)
+    elif distance_type == DistanceType.Minkowski3:
+        rdm = distance_matrix(sm_data, sm_data, p=3)
+    else:
+        raise NotImplementedError()
+
+    return RDM(matrix=rdm, labels=SPOSE.words_select_48)
