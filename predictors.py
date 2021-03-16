@@ -162,6 +162,8 @@ def add_wordnet_predictor(df: DataFrame, word_key_cols: Tuple[str, str], pos_pat
     # noinspection PyTypeChecker
     df[_predictor_name] = df.apply(calc_jcn_distance, axis=1)
 
+    return df
+
 
 def add_norms_overlap_predictor(df: DataFrame, word_key_cols: Tuple[str, str]):
     """
@@ -200,6 +202,8 @@ def add_norms_overlap_predictor(df: DataFrame, word_key_cols: Tuple[str, str]):
 
     # noinspection PyTypeChecker
     df[_predictor_name] = df.apply(calc_norms_overlap, axis=1)
+
+    return df
 
 
 def add_sensorimotor_predictor(df: DataFrame, word_key_cols: Tuple[str, str], distance_type: DistanceType):
@@ -243,3 +247,5 @@ def add_sensorimotor_predictor(df: DataFrame, word_key_cols: Tuple[str, str], di
 
     # noinspection PyTypeChecker
     df[_predictor_name] = df.apply(calc_sensorimotor_distance, axis=1)
+
+    return df
