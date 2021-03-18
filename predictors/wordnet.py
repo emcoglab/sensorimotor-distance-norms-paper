@@ -32,6 +32,8 @@ class WordnetAssociation(Enum):
 
     def association_between(self, word_1, word_2, word_1_pos, word_2_pos) -> Optional[float]:
         """
+        Compute the specified distance between pos-tagged words.
+
         :param word_1, word_2: The words
         :param word_1_pos, word_2_pos: The words' respective parts of speech tags
         :return: The association value, or None if at least one of the words wasn't available.

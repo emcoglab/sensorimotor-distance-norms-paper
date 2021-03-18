@@ -8,6 +8,10 @@ from .aux import hebart_dir
 
 
 class Spose:
+    """
+    Load Hebart et al.'s SPOSE embedding and word lists.
+    """
+
     def __init__(self):
         # Data
         with Path(hebart_dir, "spose_embedding_49d_sorted.txt").open() as spose_49_sorted_file:
@@ -22,5 +26,5 @@ class Spose:
         self.words_lsa_46 = Path(hebart_dir, "words46lsa.txt").read_text().split("\n")
         self.words_common_18 = Path(hebart_dir, "words18common.txt").read_text().split("\n")
 
-
+# Shared copy
 SPOSE = Spose()

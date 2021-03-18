@@ -22,6 +22,9 @@ from .wordnet import WordnetAssociation
 
 
 class LabelledSymmetricMatrix:
+    """
+    A symmetric matrix with a set of labels referring to rows and columns.
+    """
     def __init__(self, matrix: array, labels: List[str]):
         self.matrix: array = matrix
         self.labels: List[str] = labels
@@ -31,9 +34,11 @@ class LabelledSymmetricMatrix:
 
     @property
     def triangular_values(self) -> array:
+        """Just the values in the lower (or upper) triangular vector."""
         return squareform(self.matrix, checks=False)
 
     def for_subset(self, subset_words: List[str]) -> LabelledSymmetricMatrix:
+        """Matrix for a subset of the rows and columns."""
         idxs = find_indices(self.labels, subset_words)
         assert len(idxs) == len(subset_words)
         return LabelledSymmetricMatrix(
@@ -41,12 +46,17 @@ class LabelledSymmetricMatrix:
             labels=subset_words)
 
     def correlate_with(self, other: LabelledSymmetricMatrix) -> float:
+        """Pearson's correlation of the triangular values with another matrix."""
         assert len(self.labels) == len(other.labels)
-        return corrcoef(squareform(self.matrix), squareform(other.matrix))[0, 1]
+        return corrcoef(self.triangular_values, other.triangular_values)[0, 1]
 
 
 class SimilarityMatrix(LabelledSymmetricMatrix):
+    """
+    A labelled similarity matrix.
+    """
 
+    # Make sure return type is correct
     def for_subset(self, subset_words: List[str]) -> SimilarityMatrix:
         s = super().for_subset(subset_words)
         return SimilarityMatrix(
@@ -56,6 +66,13 @@ class SimilarityMatrix(LabelledSymmetricMatrix):
 
     @classmethod
     def by_dotproduct(cls, data_matrix: array, labels: List[str]) -> SimilarityMatrix:
+        """
+        Generate a similarity matrix using dot product on rows of a data matrix.
+
+        :param data_matrix:
+        :param labels:
+        :return:
+        """
         return cls(
             matrix=dot(data_matrix, transpose(data_matrix)),
             labels=labels)
@@ -65,6 +82,14 @@ class SimilarityMatrix(LabelledSymmetricMatrix):
                                         from_similarity_matrix: SimilarityMatrix,
                                         subset_labels: Optional[List[str]] = None
                                         ) -> SimilarityMatrix:
+        """
+        Convert a similarity matrix to a mean-softmax probability matrix using the method of Hebart et al.
+
+        :param from_similarity_matrix:
+        :param subset_labels:
+        :return:
+        """
+
         if subset_labels is None:
             subset_labels = from_similarity_matrix.labels
         idxs = find_indices(from_similarity_matrix.labels, subset_labels)
@@ -105,11 +130,20 @@ class SimilarityMatrix(LabelledSymmetricMatrix):
 
     @staticmethod
     def from_rdm(rdm: RDM) -> SimilarityMatrix:
+        """
+        Convert an RDM to a similarity matrix.
+        :param rdm:
+        :return:
+        """
         return SimilarityMatrix(matrix=1-rdm.matrix, labels=rdm.labels)
 
 
 class RDM(LabelledSymmetricMatrix):
+    """
+    A labelled representational dissimilarity matrix (RDM).
+    """
 
+    # Make sure return type is correct
     def for_subset(self, subset_words: List[str]) -> RDM:
         s = super().for_subset(subset_words)
         return RDM(
@@ -119,9 +153,21 @@ class RDM(LabelledSymmetricMatrix):
 
     @staticmethod
     def from_similarity_matrix(similarity_matrix: SimilarityMatrix) -> RDM:
+        """
+        Get an RDM from a similarity matrix.
+        :param similarity_matrix:
+        :return:
+        """
         return RDM(matrix=1 - similarity_matrix.matrix, labels=similarity_matrix.labels)
 
     def correlate_with_nhst(self, other: LabelledSymmetricMatrix, n_perms: int) -> Tuple[float, float]:
+        """
+        Correlation, using conditional-label randomisation test to generate a p-value.
+
+        :param other:
+        :param n_perms:
+        :return: r-value, p-value
+        """
         r_value = self.correlate_with(other)
         p_value = randomisation_p(rdm_1=self.matrix, rdm_2=other.matrix, observed_r=r_value, n_perms=n_perms)
         return r_value, p_value
@@ -153,6 +199,12 @@ def randomisation_p(rdm_1, rdm_2, observed_r, n_perms):
 
 
 def compute_wordnet_sm(association_type: WordnetAssociation):
+    """
+    Compute a similarity matrix on Hebart et al's 48 select words using wordnet association.
+
+    :param association_type:
+    :return:
+    """
     n_words = len(SPOSE.words_select_48)
     similarity_matrix = zeros((n_words, n_words))
     for i in range(n_words):
@@ -165,22 +217,39 @@ def compute_wordnet_sm(association_type: WordnetAssociation):
 
 
 def compute_lsa_sm():
+    """
+    Compute a similarity matrix on 46 of Hebart et al's 48 select words using LSA.
+
+    :return:
+    """
     similarity_matrix_df = read_csv(Path(lsa_dir, "hebart48-lsa.csv"), header=0, index_col=0)
     similarity_matrix = similarity_matrix_df[SPOSE.words_lsa_46].loc[SPOSE.words_lsa_46].to_numpy(dtype=float)
     return SimilarityMatrix(matrix=similarity_matrix, labels=SPOSE.words_lsa_46)
 
 
 def compute_buchanan_sm():
+    """
+    Compute a similarity matrix on 18 of Hebart et al's 48 select words using Buchanan feature overlap.
+
+    :return:
+    """
     n_words = len(SPOSE.words_common_18)
     similarity_matrix = zeros((n_words, n_words))
     for i in range(n_words):
         for j in range(n_words):
-            similarity_matrix[i, j] = BUCHANAN_FEATURE_NORMS.distance_between(SPOSE.words_common_18[i], SPOSE.words_common_18[j])
+            similarity_matrix[i, j] = BUCHANAN_FEATURE_NORMS.overlap_between(SPOSE.words_common_18[i], SPOSE.words_common_18[j])
     fill_diagonal(similarity_matrix, 1)
     return SimilarityMatrix(matrix=similarity_matrix, labels=SPOSE.words_common_18)
 
 
 def compute_sensorimotor_rdm(distance_type) -> RDM:
+    """
+    Compute a RDM matrix using sensorimotor distance on Hebart et al.'s 48 select words.
+
+    :param distance_type:
+    :return:
+    """
+
     sm_data = SensorimotorNorms().matrix_for_words(SPOSE.words_select_48)
     if distance_type == DistanceType.cosine:
         rdm = cosine_distances(sm_data)

@@ -7,6 +7,9 @@ from .aux import buchanan_dir
 
 
 class BuchananFeatureNorms:
+    """
+    Load and query the Buchanan feature norms.
+    """
 
     class SingleWordsCols:
         Cue = "CUE"
@@ -27,7 +30,15 @@ class BuchananFeatureNorms:
 
         self.available_words: List[str] = sorted(set(self.single_words_data[BuchananFeatureNorms.SingleWordsCols.Cue]))
 
-    def distance_between(self, word_1, word_2):
+    def overlap_between(self, word_1, word_2):
+        """
+        Look up the cosine root feature overlap between two words.
+
+        :param word_1:
+        :param word_2:
+        :return:
+        :raises KeyError: when one of the query words is not found
+        """
         word_1, word_2 = tuple(sorted((word_1, word_2)))
         if word_1 not in self.available_words:
             raise KeyError(word_1)
@@ -43,5 +54,5 @@ class BuchananFeatureNorms:
             # zero
             return 0
 
-
+# Shared copy
 BUCHANAN_FEATURE_NORMS = BuchananFeatureNorms()

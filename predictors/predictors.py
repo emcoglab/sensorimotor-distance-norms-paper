@@ -164,7 +164,7 @@ def add_norms_overlap_predictor(df: DataFrame, word_key_cols: Tuple[str, str]):
         i += 1
         print_progress(i, n, prefix=f"Buchanan overlap: ", bar_length=200)
         try:
-            return BUCHANAN_FEATURE_NORMS.distance_between(row[key_col_1], row[key_col_2])
+            return BUCHANAN_FEATURE_NORMS.overlap_between(row[key_col_1], row[key_col_2])
         except KeyError:
             return None
 
