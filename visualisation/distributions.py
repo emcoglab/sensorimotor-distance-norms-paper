@@ -122,17 +122,17 @@ def graph_distance_distribution(distance_type: DistanceType, n_bins: int, locati
         with distribution_save_path.open("r") as distribution_file:
             binned_distances = loadtxt(distribution_file)
         with min_attained_distances_path.open("r") as min_file:
-            min_attained_distance = loadtxt(min_file)
+            min_attained_distance = float(loadtxt(min_file))
         with max_attained_distances_path.open("r") as max_file:
-            max_attained_distance = loadtxt(max_file)
+            max_attained_distance = float(loadtxt(max_file))
     else:
         binned_distances, min_attained_distance, max_attained_distance = bin_distances(bins, distance_type)
         with distribution_save_path.open("w") as distribution_file:
             savetxt(distribution_file, binned_distances)
         with min_attained_distances_path.open("w") as min_file:
-            savetxt(min_file, min_attained_distance)
+            savetxt(min_file, array([min_attained_distance]))
         with max_attained_distances_path.open("w") as max_file:
-            savetxt(max_file, max_attained_distance)
+            savetxt(max_file, array([max_attained_distance]))
 
     logger.info(f"Attained {distance_type.name} distance range: [{min_attained_distance}, {max_attained_distance}]")
 
