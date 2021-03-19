@@ -1,4 +1,3 @@
-from logging import basicConfig, INFO
 from pathlib import Path
 from typing import Tuple
 
@@ -9,20 +8,30 @@ from scipy.spatial.distance import cdist as distance_matrix
 from matplotlib import pyplot
 
 from linguistic_distributional_models.utils.maths import DistanceType, distance
-from predictors.aux import logger, logger_format, logger_dateformat
+from predictors.aux import logger
 from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
 
 sn = SensorimotorNorms()
 
 
 def bin_distances(bins, distance_type, n_bins):
-    binned_distances = zeros(n_bins - 1)
-    for i, word in enumerate(sn.iter_words()):
+    """
+    We don't want to get the entire 40k-by-40k distance matrix into memory at once, so instead we can pre-define the
+    bins for the histograms, and accumulate the totals a bit at a time.
+
+    :param bins:
+    :param distance_type:
+    :param n_bins:
+    :return:
+    """
+    binned_distances = zeros(n_bins - 1, dtype=int)
+    all_words = list(sn.iter_words())
+    for i, word in enumerate(all_words):
         if i % 1_000 == 0:
             logger.info(f"Done {i:,} words")
 
         word_vector = array(sn.vector_for_word(word))
-        all_data = array(sn.matrix_for_words(list(sn.iter_words())))
+        all_data = array(sn.matrix_for_words(all_words))
 
         if distance_type == DistanceType.Minkowski3:
             distances: array = minkowski_distance_matrix(word_vector.reshape(1, 11), all_data, 3)
@@ -31,6 +40,20 @@ def bin_distances(bins, distance_type, n_bins):
 
         htemp, _ = histogram(distances, bins)
         binned_distances += htemp
+    # We've double-counted many of the distances by matching word X with all words (including Y) and word Y with all
+    # words (including X). However we haven't double-counted the diagonal (each word X was matched with all words,
+    # including X, but only once).
+    # Therefore we need to do a bit of arithmetic to adjust the totals appropriately.
+    # For every bin except for the one containing 0, we need to halve the totals.
+    binned_distances[1:] /= 2
+    # For the first bin, which includes all the 0 distances of identity pairs, we need to be cleverer
+    n_identity_pairs = len(all_words)
+    binned_distances[0] = (
+        # Half of the counts for the non-identity pairs
+        ((binned_distances[0] - n_identity_pairs) / 2)
+        # And all of the identity pairs
+        + n_identity_pairs
+    )
     return binned_distances
 
 
@@ -40,6 +63,16 @@ def style_histplot(ax: Axes, xlim: Tuple[float, float]):
 
 
 def graph_distance_distribution(distance_type: DistanceType, n_bins: int, location: Path, overwrite: bool):
+    """
+    Graph the distribution of distances among all pairs of concepts in the norms.
+
+    :param distance_type:
+    :param n_bins:
+    :param location:
+    :param overwrite:
+    :return:
+    """
+
     figure_save_path = Path(location, f"distance distribution {distance_type.name} {n_bins} bins.svg")
     distribution_save_path = Path(location, f"distance distribution {distance_type.name} {n_bins} bins.csv")
 

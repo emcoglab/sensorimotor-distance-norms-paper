@@ -292,7 +292,7 @@ if __name__ == '__main__':
 
     # TODO: make these CLI args
     save_dir = Path("/Users/caiwingfield/Resilio Sync/Lancaster/Sensorimotor distance paper/Output/")
-    overwrite = True
+    overwrite = False
     n_perms = 100_000
     n_bins = 100
 
