@@ -1,3 +1,8 @@
 -r linguistic_distributional_models/requirements.txt
 -r sensorimotor_norms/requirements.txt
+matplotlib
+nltk
+numpy
+scipy
+sklearn
 pandas

@@ -16,6 +16,7 @@ from predictors.predictors import add_wordnet_predictor, add_lsa_predictor, add_
 from predictors.rsa import compute_buchanan_sm, RDM, SimilarityMatrix, compute_lsa_sm, compute_wordnet_sm, \
     compute_sensorimotor_rdm, subset_flag
 from predictors.wordnet import WordnetAssociation
+from visualisation.distributions import graph_distance_distributions
 
 
 def common_similarity_modelling(df: DataFrame,
@@ -165,7 +166,6 @@ def model_hebart(location: Path, overwrite: bool, n_perms: int) -> None:
     :param n_perms: How many permutations to use for nonparametric NHST.
     """
 
-    save_dir = Path(location, "hebart")
     results_path = Path(location, "hebart_results.csv")
 
     # TODO: (minor) this doesn't really respect the "overwrite" flag properly as it will prevent raw values being saved
@@ -215,9 +215,9 @@ def model_hebart(location: Path, overwrite: bool, n_perms: int) -> None:
          18, *rdm_participants.for_subset(SPOSE.words_common_18)
          .correlate_with_nhst(rdm_spose_bottom11.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
     ])
-    save_raw_values(rdm_participants, rdm_spose, Path(save_dir, "spose.csv"), overwrite)
-    save_raw_values(rdm_participants, rdm_spose_top11, Path(save_dir, "spose_top11.csv"), overwrite)
-    save_raw_values(rdm_participants, rdm_spose_bottom11, Path(save_dir, "spose_bottom11.csv"), overwrite)
+    save_raw_values(rdm_participants, rdm_spose, Path(location, "spose.csv"), overwrite)
+    save_raw_values(rdm_participants, rdm_spose_top11, Path(location, "spose_top11.csv"), overwrite)
+    save_raw_values(rdm_participants, rdm_spose_bottom11, Path(location, "spose_bottom11.csv"), overwrite)
 
     # LSA
     rdm_lsa = RDM.from_similarity_matrix(
@@ -230,7 +230,7 @@ def model_hebart(location: Path, overwrite: bool, n_perms: int) -> None:
          18, *rdm_participants.for_subset(SPOSE.words_common_18)
          .correlate_with_nhst(rdm_lsa.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
     ])
-    save_raw_values(rdm_participants.for_subset(SPOSE.words_lsa_46), rdm_lsa, Path(save_dir, "lsa.csv"), overwrite)
+    save_raw_values(rdm_participants.for_subset(SPOSE.words_lsa_46), rdm_lsa, Path(location, "lsa.csv"), overwrite)
 
     # Wordnet
     wordnet_association = WordnetAssociation.Resnik
@@ -244,7 +244,7 @@ def model_hebart(location: Path, overwrite: bool, n_perms: int) -> None:
          18, *rdm_participants.for_subset(SPOSE.words_common_18)
          .correlate_with_nhst(rdm_wordnet.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
     ])
-    save_raw_values(rdm_participants, rdm_wordnet, Path(save_dir, "wordnet.csv"), overwrite)
+    save_raw_values(rdm_participants, rdm_wordnet, Path(location, "wordnet.csv"), overwrite)
 
     # Buchanan
     rdm_buchanan = RDM.from_similarity_matrix(
@@ -254,7 +254,7 @@ def model_hebart(location: Path, overwrite: bool, n_perms: int) -> None:
          18, *rdm_participants.for_subset(SPOSE.words_common_18)
          .correlate_with_nhst(rdm_buchanan, n_perms=n_perms))
     ])
-    save_raw_values(rdm_participants.for_subset(SPOSE.words_common_18), rdm_buchanan, Path(save_dir, "buchanan.csv"), overwrite)
+    save_raw_values(rdm_participants.for_subset(SPOSE.words_common_18), rdm_buchanan, Path(location, "buchanan.csv"), overwrite)
 
     # Sensorimotor
     sensorimotor_distance = DistanceType.cosine
@@ -269,7 +269,7 @@ def model_hebart(location: Path, overwrite: bool, n_perms: int) -> None:
          18, *rdm_participants.for_subset(SPOSE.words_common_18)
          .correlate_with_nhst(rdm_sensorimotor.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
     ])
-    save_raw_values(rdm_participants, rdm_sensorimotor, Path(save_dir, "sensorimotor.csv"), overwrite)
+    save_raw_values(rdm_participants, rdm_sensorimotor, Path(location, "sensorimotor.csv"), overwrite)
 
     with results_path.open("w") as save_file:
         DataFrame.from_records(
@@ -294,11 +294,15 @@ if __name__ == '__main__':
     save_dir = Path("/Users/caiwingfield/Resilio Sync/Lancaster/Sensorimotor distance paper/Output/")
     overwrite = True
     n_perms = 100_000
+    n_bins = 100
+
+    # Graph distributions for each measure
+    graph_distance_distributions(location=Path(save_dir, "Figures"), overwrite=overwrite, n_bins=n_bins)
 
     # Run each of the analyses in turn
     model_wordsim(location=save_dir, overwrite=overwrite)
     model_simlex(location=save_dir, overwrite=overwrite)
     model_men(location=save_dir, overwrite=overwrite)
-    model_hebart(location=save_dir, overwrite=overwrite, n_perms=n_perms)
+    model_hebart(location=Path(save_dir, "Hebart"), overwrite=overwrite, n_perms=n_perms)
 
     logger.info("Done!")
