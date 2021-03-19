@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Tuple
 
 from matplotlib.axes import Axes
-from numpy import repeat, linspace, loadtxt, zeros, histogram, array, savetxt
+from numpy import repeat, linspace, loadtxt, zeros, histogram, array, savetxt, inf
 from scipy.spatial import distance_matrix as minkowski_distance_matrix
 from scipy.spatial.distance import cdist as distance_matrix
 from matplotlib import pyplot
@@ -14,25 +14,30 @@ from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
 sn = SensorimotorNorms()
 
 
-def bin_distances(bins, distance_type):
+def bin_distances(bins, distance_type) -> Tuple[array, float, float]:
     """
     Get all pairwise distances from the model and graph a histogram distribution using the specified bins.
 
     :param bins: array of bin inclusive lower-bounds plus the inclusive upper bound of the last bin (e.g. from linspace)
     :param distance_type:
-    :return:
+    :return: tuple:
+        binned distances (array of counts of distances for each bin),
+        min attained distance
+        max attained distance
     """
 
     n_bins = len(bins) - 1
+    all_words = list(sn.iter_words())
 
     # We don't want to get the entire 40k-by-40k distance matrix into memory at once, so instead we can pre-define the
     # bins for the histograms, and accumulate the totals a bit at a time.
 
+    min_attained_distance = inf
+    max_attained_distance = 0
     binned_distances = zeros(n_bins,
                              # floats to avoid broadcasting errors on divides below.
                              # We'll cast to int later
                              dtype=float)
-    all_words = list(sn.iter_words())
     for i, word in enumerate(all_words):
         if i % 1_000 == 0:
             logger.info(f"Done {i:,} words")
@@ -47,6 +52,9 @@ def bin_distances(bins, distance_type):
 
         htemp, _ = histogram(distances, bins)
         binned_distances += htemp
+
+        min_attained_distance = min(min_attained_distance, distances[:].min())
+        max_attained_distance = max(max_attained_distance, distances[:].max())
 
     # We've double-counted many of the distances by matching word X with all words (including Y) and word Y with all
     # words (including X). However we haven't double-counted the diagonal (each word X was matched with all words,
@@ -64,7 +72,7 @@ def bin_distances(bins, distance_type):
     )
 
     assert (binned_distances == binned_distances.astype(int)).all()
-    return binned_distances.astype(int)
+    return binned_distances.astype(int), min_attained_distance, max_attained_distance
 
 
 def style_histplot(ax: Axes, xlim: Tuple[float, float]):
@@ -84,7 +92,9 @@ def graph_distance_distribution(distance_type: DistanceType, n_bins: int, locati
     """
 
     figure_save_path = Path(location, f"distance distribution {distance_type.name} {n_bins} bins.svg")
-    distribution_save_path = Path(location, f"distance distribution {distance_type.name} {n_bins} bins.csv")
+    distribution_save_path = Path(location, f"distance distribution {distance_type.name} {n_bins} bins.txt")
+    min_attained_distances_path = Path(location, f"distance {distance_type.name} minimum attained.txt")
+    max_attained_distances_path = Path(location, f"distance {distance_type.name} maximum attained.txt")
 
     min_distance = 0
     if distance_type == distance_type.cosine:
@@ -108,10 +118,20 @@ def graph_distance_distribution(distance_type: DistanceType, n_bins: int, locati
         logger.warning(f"{distribution_save_path} exists, skipping")
         with distribution_save_path.open("r") as distribution_file:
             binned_distances = loadtxt(distribution_file)
+        with min_attained_distances_path.open("r") as min_file:
+            min_attained_distance = loadtxt(min_file)
+        with max_attained_distances_path.open("r") as max_file:
+            max_attained_distance = loadtxt(max_file)
     else:
-        binned_distances = bin_distances(bins, distance_type)
+        binned_distances, min_attained_distance, max_attained_distance = bin_distances(bins, distance_type)
         with distribution_save_path.open("w") as distribution_file:
             savetxt(distribution_file, binned_distances)
+        with min_attained_distances_path.open("w") as min_file:
+            savetxt(min_file, min_attained_distance)
+        with max_attained_distances_path.open("w") as max_file:
+            savetxt(max_file, max_attained_distance)
+
+    logger.info(f"Attained {distance_type.name} distance range: [{min_attained_distance}, {max_attained_distance}]")
 
     fig, ax = pyplot.subplots(tight_layout=True)
     ax.hist(
