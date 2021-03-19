@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Tuple
 
 from matplotlib.axes import Axes
-from numpy import repeat, linspace, loadtxt, zeros, histogram, array, savetxt, inf
+from numpy import array, zeros, arange, repeat, linspace, savetxt, loadtxt, histogram, inf
 from scipy.spatial import distance_matrix as minkowski_distance_matrix
 from scipy.spatial.distance import cdist as distance_matrix
 from matplotlib import pyplot
@@ -46,15 +46,18 @@ def bin_distances(bins, distance_type) -> Tuple[array, float, float]:
         all_data = array(sn.matrix_for_words(all_words))
 
         if distance_type == DistanceType.Minkowski3:
-            distances: array = minkowski_distance_matrix(word_vector.reshape(1, 11), all_data, 3)
+            distances_this_word: array = minkowski_distance_matrix(word_vector.reshape(1, 11), all_data, 3).flatten()
         else:
-            distances: array = distance_matrix(word_vector.reshape(1, 11), all_data, metric=distance_type.name)
+            distances_this_word: array = distance_matrix(word_vector.reshape(1, 11), all_data, metric=distance_type.name).flatten()
 
-        htemp, _ = histogram(distances, bins)
-        binned_distances += htemp
+        binned_distances_this_word, _ = histogram(distances_this_word, bins)
+        binned_distances += binned_distances_this_word
 
-        min_attained_distance = min(min_attained_distance, distances[:].min())
-        max_attained_distance = max(max_attained_distance, distances[:].max())
+        min_attained_distance = min(min_attained_distance,
+                                    # for minimum distances, we don't want to include the 0 from the identity comparison
+                                    # thanks to https://stackoverflow.com/a/19286855/2883198
+                                    distances_this_word[arange(len(distances_this_word)) != i].min())
+        max_attained_distance = max(max_attained_distance, distances_this_word.max())
 
     # We've double-counted many of the distances by matching word X with all words (including Y) and word Y with all
     # words (including X). However we haven't double-counted the diagonal (each word X was matched with all words,
