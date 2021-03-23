@@ -209,7 +209,7 @@ def compute_wordnet_sm(association_type: WordnetAssociation):
     similarity_matrix = zeros((n_words, n_words))
     for i in range(n_words):
         for j in range(n_words):
-            similarity_matrix[i, j] = association_type.association_between(
+            similarity_matrix[i, j] = association_type.similarity_between(
                 word_1=SPOSE.words_select_48[i], word_1_pos=NOUN,
                 word_2=SPOSE.words_select_48[j], word_2_pos=NOUN)
     fill_diagonal(similarity_matrix, 1)

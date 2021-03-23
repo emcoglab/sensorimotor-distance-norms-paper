@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import Tuple, Dict, Optional
 
-from nltk.corpus import wordnet_ic
 # noinspection PyProtectedMember
 from pandas import DataFrame, read_csv, merge
 
@@ -31,13 +30,8 @@ def add_lsa_predictor(df: DataFrame, word_key_cols: Tuple[str, str], lsa_path: P
         This must be a 3-column csv
     :return:
         `df`, plus the "LSA" column.
-        If a column named "LSA" already exists in `df`, nothing will be added.
     """
     _predictor_name = "LSA"
-
-    if _predictor_name in df.columns:
-        logger.warning("Predictor already exists, skipping")
-        return df
 
     assert len(word_key_cols) == 2
     key_col_1, key_col_2 = word_key_cols
@@ -68,18 +62,11 @@ def add_wordnet_predictor(df: DataFrame,
         Which type of wordnet association to use
     :return:
         `df` with the appropriately named wordneet distance column added.
-        If the column already existed in `df`, nothing new will be added.
     """
     _predictor_name = f"WordNet association ({association_type.name})"
 
-    if _predictor_name in df.columns:
-        logger.info("Predictor already exists, skipping")
-        return
-
     assert len(word_key_cols) == 2
     key_col_1, key_col_2 = word_key_cols
-
-    brown_ic = wordnet_ic.ic('ic-brown.dat')
 
     elex_pos: Dict[str, str]
     if pos_path is not None:
@@ -122,7 +109,7 @@ def add_wordnet_predictor(df: DataFrame,
         w1 = row[key_col_1]
         w2 = row[key_col_2]
 
-        return WordnetAssociation.JCN.association_between(
+        return WordnetAssociation.JiangConrath.distance_between(
             word_1=w1, word_1_pos=get_pos(w1),
             word_2=w2, word_2_pos=get_pos(w2),
         )
@@ -144,13 +131,8 @@ def add_norms_overlap_predictor(df: DataFrame, word_key_cols: Tuple[str, str]):
         calculated.
     :return:
         `df` plus an appropriately named feature overlap column.
-        If a column of the same name already existed, nothing will be added.
     """
     _predictor_name = "Buchanan root cosine overlap"
-
-    if _predictor_name in df.columns:
-        logger.info("Predictor already exists, skipping")
-        return
 
     assert len(word_key_cols) == 2
     key_col_1, key_col_2 = word_key_cols

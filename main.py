@@ -40,7 +40,7 @@ def common_similarity_modelling(df: DataFrame,
         df,
         word_key_cols=word_key_cols,
         pos_path=pos_path,
-        association_type=WordnetAssociation.JCN)
+        association_type=WordnetAssociation.JiangConrath)
     df = add_lsa_predictor(
         df,
         word_key_cols=word_key_cols,
@@ -233,18 +233,28 @@ def model_hebart(location: Path, overwrite: bool, n_perms: int) -> None:
     save_raw_values(rdm_participants.for_subset(SPOSE.words_lsa_46), rdm_lsa, Path(location, "lsa.csv"), overwrite)
 
     # Wordnet
-    wordnet_association = WordnetAssociation.Resnik
-    rdm_wordnet = RDM.from_similarity_matrix(
-        SimilarityMatrix.mean_softmax_probability_matrix(compute_wordnet_sm(association_type=wordnet_association)))
+    rdm_wordnet_jcn = RDM.from_similarity_matrix(
+        SimilarityMatrix.mean_softmax_probability_matrix(compute_wordnet_sm(association_type=WordnetAssociation.JiangConrath)))
+    rdm_wordnet_res = RDM.from_similarity_matrix(
+        SimilarityMatrix.mean_softmax_probability_matrix(compute_wordnet_sm(association_type=WordnetAssociation.Resnik)))
     results.extend([
-        ("Participants", f"Wordnet {wordnet_association.name}",
+        ("Participants", f"Wordnet {WordnetAssociation.JiangConrath.name}",
          48, *rdm_participants
-         .correlate_with_nhst(rdm_wordnet, n_perms=n_perms)),
-        ("Participants", f"Wordnet {wordnet_association.name}",
+         .correlate_with_nhst(rdm_wordnet_jcn, n_perms=n_perms)),
+        ("Participants", f"Wordnet {WordnetAssociation.JiangConrath.name}",
          18, *rdm_participants.for_subset(SPOSE.words_common_18)
-         .correlate_with_nhst(rdm_wordnet.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
+         .correlate_with_nhst(rdm_wordnet_jcn.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
     ])
-    save_raw_values(rdm_participants, rdm_wordnet, Path(location, "wordnet.csv"), overwrite)
+    results.extend([
+        ("Participants", f"Wordnet {WordnetAssociation.Resnik.name}",
+         48, *rdm_participants
+         .correlate_with_nhst(rdm_wordnet_res, n_perms=n_perms)),
+        ("Participants", f"Wordnet {WordnetAssociation.Resnik.name}",
+         18, *rdm_participants.for_subset(SPOSE.words_common_18)
+         .correlate_with_nhst(rdm_wordnet_res.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
+    ])
+    save_raw_values(rdm_participants, rdm_wordnet_jcn, Path(location, f"wordnet {WordnetAssociation.JiangConrath.name}.csv"), overwrite)
+    save_raw_values(rdm_participants, rdm_wordnet_res, Path(location, f"wordnet {WordnetAssociation.Resnik.name}.csv"), overwrite)
 
     # Buchanan
     rdm_buchanan = RDM.from_similarity_matrix(
@@ -292,7 +302,7 @@ if __name__ == '__main__':
 
     # TODO: make these CLI args
     save_dir = Path("/Users/caiwingfield/Resilio Sync/Lancaster/Sensorimotor distance paper/Output/")
-    overwrite = False
+    overwrite = True
     n_perms = 100_000
     n_bins = 100
 
@@ -303,6 +313,7 @@ if __name__ == '__main__':
     model_wordsim(location=save_dir, overwrite=overwrite)
     model_simlex(location=save_dir, overwrite=overwrite)
     model_men(location=save_dir, overwrite=overwrite)
+
     model_hebart(location=Path(save_dir, "Hebart"), overwrite=overwrite, n_perms=n_perms)
 
     logger.info("Done!")
