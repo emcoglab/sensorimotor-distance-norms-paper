@@ -301,7 +301,7 @@ if __name__ == '__main__':
     seed(1)
 
     # TODO: make these CLI args
-    save_dir = Path("/Users/caiwingfield/Resilio Sync/Lancaster/Sensorimotor distance paper/Output/")
+    save_dir = Path("/Users/caiwingfield/Box Sync/LANGBOOT Project/Manuscripts/Sensorimotor proximity/Output/")
     overwrite = True
     n_perms = 100_000
     n_bins = 100
