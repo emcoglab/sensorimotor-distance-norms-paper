@@ -323,10 +323,11 @@ if __name__ == '__main__':
     save_dir = Path("/Users/caiwingfield/Box Sync/LANGBOOT Project/Manuscripts/Sensorimotor proximity/Output/")
     overwrite = True
     n_perms = 100_000
-    n_bins = 100
 
     # Graph distributions for each measure
-    graph_distance_distributions(location=Path(save_dir, "Figures"), overwrite=overwrite, n_bins=n_bins)
+    graph_distance_distributions(location=Path(save_dir, "Figures"), overwrite=overwrite,
+                                 n_bins=10, ylim=None,
+                                 )
 
     # Run each of the analyses in turn
     model_wordsim(location=save_dir, overwrite=overwrite)

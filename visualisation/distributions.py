@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Optional
 
 from matplotlib.axes import Axes
 from numpy import array, zeros, arange, repeat, linspace, savetxt, loadtxt, histogram, inf
@@ -78,17 +78,21 @@ def bin_distances(bins, distance_type) -> Tuple[array, float, float]:
     return binned_distances.astype(int), min_attained_distance, max_attained_distance
 
 
-def style_histplot(ax: Axes, xlim: Tuple[float, float]):
+def style_histplot(ax: Axes, xlim: Tuple[float, float], ylim: Optional[Tuple[float, float]]):
     # noinspection PyTypeChecker
     ax.set_xlim(xlim)
+    if ylim is not None:
+        ax.set_ylim(ylim)
 
 
-def graph_distance_distribution(distance_type: DistanceType, n_bins: int, location: Path, overwrite: bool):
+def graph_distance_distribution(distance_type: DistanceType, n_bins: int, location: Path, overwrite: bool,
+                                ylim: Optional[Tuple[float, float]]):
     """
     Graph the distribution of distances among all pairs of concepts in the norms.
 
     :param distance_type:
     :param n_bins:
+    :param ylim:
     :param location:
     :param overwrite:
     :return:
@@ -142,18 +146,19 @@ def graph_distance_distribution(distance_type: DistanceType, n_bins: int, locati
         bins[:-1],
         weights=binned_distances, bins=bins)
 
-    style_histplot(ax, xlim=(min_distance, max_distance))
+    style_histplot(ax, xlim=(min_distance, max_distance), ylim=ylim)
 
     fig.savefig(figure_save_path)
     pyplot.close(fig)
 
 
-def graph_distance_distributions(n_bins: int, location: Path, overwrite: bool):
+def graph_distance_distributions(n_bins: int, location: Path, overwrite: bool,
+                                 ylim: Optional[Tuple[float, float]] = None):
     graph_distance_distribution(
-        distance_type=DistanceType.cosine, n_bins=n_bins, location=location, overwrite=overwrite)
+        distance_type=DistanceType.cosine, n_bins=n_bins, location=location, overwrite=overwrite, ylim=ylim)
     graph_distance_distribution(
-        distance_type=DistanceType.correlation, n_bins=n_bins, location=location, overwrite=overwrite)
+        distance_type=DistanceType.correlation, n_bins=n_bins, location=location, overwrite=overwrite, ylim=ylim)
     graph_distance_distribution(
-        distance_type=DistanceType.Minkowski3, n_bins=n_bins, location=location, overwrite=overwrite)
+        distance_type=DistanceType.Minkowski3, n_bins=n_bins, location=location, overwrite=overwrite, ylim=ylim)
     graph_distance_distribution(
-        distance_type=DistanceType.Euclidean, n_bins=n_bins, location=location, overwrite=overwrite)
+        distance_type=DistanceType.Euclidean, n_bins=n_bins, location=location, overwrite=overwrite, ylim=ylim)
