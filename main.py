@@ -333,6 +333,6 @@ if __name__ == '__main__':
     model_simlex(location=save_dir, overwrite=overwrite)
     model_men(location=save_dir, overwrite=overwrite)
 
-    model_hebart(location=Path(save_dir, "Hebart"), overwrite=overwrite, n_perms=n_perms)
+    # model_hebart(location=Path(save_dir, "Hebart"), overwrite=overwrite, n_perms=n_perms)
 
     logger.info("Done!")
