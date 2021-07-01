@@ -16,6 +16,7 @@ from predictors.predictors import add_wordnet_predictor, add_lsa_predictor, add_
 from predictors.rsa import compute_buchanan_sm, RDM, SimilarityMatrix, compute_lsa_sm, compute_wordnet_sm, \
     compute_sensorimotor_rdm, subset_flag
 from predictors.wordnet import WordnetAssociation
+from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
 from visualisation.distributions import graph_distance_distributions
 
 
@@ -147,6 +148,7 @@ def save_raw_values(reference_rdm: RDM, comparison_rdm: RDM, save_path: Path, ov
         logger.warning(f"{save_path} exists, skipping")
         return
 
+    save_path.parent.mkdir(exist_ok=True)
     with save_path.open("w") as save_file:
         DataFrame.from_dict({
             "Reference RDM values": reference_rdm.triangular_values,
@@ -280,6 +282,23 @@ def model_hebart(location: Path, overwrite: bool, n_perms: int) -> None:
          .correlate_with_nhst(rdm_sensorimotor.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
     ])
     save_raw_values(rdm_participants, rdm_sensorimotor, Path(location, "sensorimotor.csv"), overwrite)
+
+    # Sensorimotor 10-dim subspaces
+    for exclude_dimension in SensorimotorNorms().VectorColNames:
+        rdm_sensorimotor = RDM.from_similarity_matrix(
+            SimilarityMatrix.mean_softmax_probability_matrix(
+                SimilarityMatrix.from_rdm(compute_sensorimotor_rdm(distance_type=sensorimotor_distance,
+                                                                   exclude_dimension=exclude_dimension))))
+        results.extend([
+            ("Participants", f"Sensorimotor {sensorimotor_distance.name} excluding {exclude_dimension}",
+             48, *rdm_participants
+             .correlate_with_nhst(rdm_sensorimotor, n_perms=n_perms)),
+            ("Participants", f"Sensorimotor {sensorimotor_distance.name} excluding {exclude_dimension}",
+             18, *rdm_participants.for_subset(SPOSE.words_common_18)
+             .correlate_with_nhst(rdm_sensorimotor.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
+        ])
+        save_raw_values(rdm_participants, rdm_sensorimotor,
+                        Path(location, f"sensorimotor_excluding_{exclude_dimension}.csv"), overwrite)
 
     with results_path.open("w") as save_file:
         DataFrame.from_records(

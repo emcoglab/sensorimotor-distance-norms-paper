@@ -6,6 +6,7 @@ from typing import List, Optional, Tuple
 # noinspection PyProtectedMember
 from nltk.corpus.reader import NOUN
 from numpy import zeros, corrcoef, ix_, exp, fill_diagonal, transpose, array, dot
+from numpy.ma import array as masked_array
 from numpy.random import permutation
 from pandas import read_csv
 from scipy.spatial import distance_matrix
@@ -242,15 +243,26 @@ def compute_buchanan_sm():
     return SimilarityMatrix(matrix=similarity_matrix, labels=SPOSE.words_common_18)
 
 
-def compute_sensorimotor_rdm(distance_type) -> RDM:
+def compute_sensorimotor_rdm(distance_type, exclude_dimension: Optional[str] = None) -> RDM:
     """
     Compute a RDM matrix using sensorimotor distance on Hebart et al.'s 48 select words.
 
     :param distance_type:
+    :param exclude_dimension:
+        To assess the relative contributions of each of the sensorimotor dimensions to this, optionally exclude one of
+        them by name. Pass None (the default_ to not exclude a dimension.
     :return:
     """
 
     sm_data = SensorimotorNorms().matrix_for_words(SPOSE.words_select_48)
+    if exclude_dimension is not None:
+        # Mask and then exclude the entries from the excluded dimension
+        excluded_dimension_idx = SensorimotorNorms().VectorColNames.index(exclude_dimension)
+        if excluded_dimension_idx == -1:
+            raise ValueError(exclude_dimension)
+        masked_sm_data = masked_array(sm_data, mask=False)
+        masked_sm_data.mask[:, excluded_dimension_idx] = True
+        sm_data = masked_sm_data.compressed().reshape((48, 10))
     if distance_type == DistanceType.cosine:
         rdm = cosine_distances(sm_data)
     elif distance_type == DistanceType.Minkowski3:

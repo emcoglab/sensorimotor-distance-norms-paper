@@ -100,7 +100,7 @@ def add_wordnet_predictor(df: DataFrame,
     i = 0
     n = df.shape[0]
 
-    def calc_jcn_distance(row):
+    def calc_jiang_conrath_distance(row):
         nonlocal i
         i += 1
         print_progress(i, n, prefix=f"WordNet {association_type.name}: ", bar_length=200)
@@ -115,7 +115,7 @@ def add_wordnet_predictor(df: DataFrame,
         )
 
     # noinspection PyTypeChecker
-    df[_predictor_name] = df.apply(calc_jcn_distance, axis=1)
+    df[_predictor_name] = df.apply(calc_jiang_conrath_distance, axis=1)
 
     return df
 
