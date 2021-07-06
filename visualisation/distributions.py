@@ -112,7 +112,6 @@ def graph_distance_distribution(distance_type: DistanceType, n_bins: int, locati
         max_distance = 2.0
     else:
         max_distance = distance(repeat(sn.rating_min, 11), repeat(sn.rating_max, 11), distance_type=distance_type)
-    logger.info(f"Max theoretical pairwise {distance_type.name} distance between concepts: {max_distance}")
 
     # [:-1] determine the inclusive lower-bounds of each bin.
     # [-1] determines the inclusive upper bound of the last bin
@@ -138,6 +137,7 @@ def graph_distance_distribution(distance_type: DistanceType, n_bins: int, locati
         with max_attained_distances_path.open("w") as max_file:
             savetxt(max_file, array([max_attained_distance]))
 
+    logger.info(f"Max theoretical pairwise {distance_type.name} distance between concepts: {max_distance}")
     logger.info(f"Attained {distance_type.name} distance range: [{min_attained_distance}, {max_attained_distance}]")
 
     fig, ax = pyplot.subplots(tight_layout=True)
@@ -150,15 +150,3 @@ def graph_distance_distribution(distance_type: DistanceType, n_bins: int, locati
 
     fig.savefig(figure_save_path)
     pyplot.close(fig)
-
-
-def graph_distance_distributions(n_bins: int, location: Path, overwrite: bool,
-                                 ylim: Optional[Tuple[float, float]] = None):
-    graph_distance_distribution(
-        distance_type=DistanceType.cosine, n_bins=n_bins, location=location, overwrite=overwrite, ylim=ylim)
-    graph_distance_distribution(
-        distance_type=DistanceType.correlation, n_bins=n_bins, location=location, overwrite=overwrite, ylim=ylim)
-    graph_distance_distribution(
-        distance_type=DistanceType.Minkowski3, n_bins=n_bins, location=location, overwrite=overwrite, ylim=ylim)
-    graph_distance_distribution(
-        distance_type=DistanceType.Euclidean, n_bins=n_bins, location=location, overwrite=overwrite, ylim=ylim)

@@ -1,9 +1,9 @@
 from logging import basicConfig, INFO
 from pathlib import Path
 from random import seed
-from typing import Tuple
+from typing import Tuple, Iterable
 
-from pandas import DataFrame
+from pandas import DataFrame, concat, read_csv
 from scipy.io import loadmat
 
 from linguistic_distributional_models.evaluation.association import WordsimAll, WordAssociationTest, SimlexSimilarity, \
@@ -17,7 +17,7 @@ from predictors.rsa import compute_buchanan_sm, RDM, SimilarityMatrix, compute_l
     compute_sensorimotor_rdm, subset_flag
 from predictors.wordnet import WordnetAssociation
 from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
-from visualisation.distributions import graph_distance_distributions
+from visualisation.distributions import graph_distance_distribution
 
 
 def common_similarity_modelling(df: DataFrame,
@@ -58,8 +58,10 @@ def common_similarity_modelling(df: DataFrame,
     with save_path.open("w") as save_file:
         df.to_csv(save_file, header=True, index=False)
 
+    return df
 
-def model_wordsim(location: Path, overwrite: bool) -> None:
+
+def model_wordsim(location: Path, overwrite: bool) -> DataFrame:
     """
     Model the WordSim dataset using all predictors.
 
@@ -72,9 +74,10 @@ def model_wordsim(location: Path, overwrite: bool) -> None:
 
     if save_path.exists() and not overwrite:
         logger.warning(f"{save_path} exists, skipping")
-        return
+        with save_path.open("r") as f:
+            return read_csv(f)
 
-    common_similarity_modelling(
+    wordsim_data = common_similarity_modelling(
         # Load data from source:
         df=WordsimAll().associations_to_dataframe(),
         word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2),
@@ -82,8 +85,10 @@ def model_wordsim(location: Path, overwrite: bool) -> None:
         pos_path=Path(pos_dir, "wordsim-pos.tab"),
         save_path=save_path)
 
+    return wordsim_data
 
-def model_simlex(location: Path, overwrite: bool) -> None:
+
+def model_simlex(location: Path, overwrite: bool) -> DataFrame:
     """
     Model the Simlex dataset using all predictors.
 
@@ -96,9 +101,10 @@ def model_simlex(location: Path, overwrite: bool) -> None:
 
     if save_path.exists() and not overwrite:
         logger.warning(f"{save_path} exists, skipping")
-        return
+        with save_path.open("r") as f:
+            return read_csv(f)
 
-    common_similarity_modelling(
+    simlex_data = common_similarity_modelling(
         # Load data from source:
         df=SimlexSimilarity().associations_to_dataframe(),
         word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2),
@@ -106,8 +112,10 @@ def model_simlex(location: Path, overwrite: bool) -> None:
         pos_path=Path(pos_dir, "simlex-pos.tab"),
         save_path=save_path)
 
+    return simlex_data
 
-def model_men(location: Path, overwrite: bool) -> None:
+
+def model_men(location: Path, overwrite: bool) -> DataFrame:
     """
     Model the MEN dataset using all predictors.
 
@@ -119,15 +127,18 @@ def model_men(location: Path, overwrite: bool) -> None:
 
     if save_path.exists() and not overwrite:
         logger.warning(f"{save_path} exists, skipping")
-        return
+        with save_path.open("r") as f:
+            return read_csv(f)
 
-    common_similarity_modelling(
+    men_data = common_similarity_modelling(
         # Load data from source:
         df=MenSimilarity().associations_to_dataframe(),
         word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2),
         lsa_path=Path(lsa_dir, "men-lsa.csv"),
         pos_path=Path(pos_dir, "men-pos.tab"),
         save_path=save_path)
+
+    return men_data
 
 
 def save_raw_values(reference_rdm: RDM, comparison_rdm: RDM, save_path: Path, overwrite: bool):
@@ -313,6 +324,17 @@ def model_hebart(location: Path, overwrite: bool, n_perms: int) -> None:
         ).to_csv(save_file, header=True, index=False)
 
 
+def save_combined_pairs(dfs: Iterable[DataFrame], location: Path) -> None:
+    combined_data: DataFrame = concat(dfs)
+    combined_data.drop_duplicates(subset=[WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2],
+                                  inplace=True)
+    # This isn't comparable between datasets, and isn't used for the gramd correlation
+    del combined_data[WordAssociationTest.TestColumn.association_strength]
+
+    with Path(location, "combined.csv").open("w") as f:
+        combined_data.to_csv(f, header=True, index=False)
+
+
 if __name__ == '__main__':
     basicConfig(format=logger_format, datefmt=logger_dateformat, level=INFO)
 
@@ -325,14 +347,24 @@ if __name__ == '__main__':
     n_perms = 100_000
 
     # Graph distributions for each measure
-    graph_distance_distributions(location=Path(save_dir, "Figures"), overwrite=overwrite,
-                                 n_bins=10, ylim=None,
-                                 )
+    location = Path(save_dir, "Figures")
+    n_bins = 20
+    ylim = None
+    graph_distance_distribution(
+        distance_type=DistanceType.cosine, n_bins=n_bins, location=location, overwrite=overwrite, ylim=ylim)
+    graph_distance_distribution(
+        distance_type=DistanceType.correlation, n_bins=n_bins, location=location, overwrite=overwrite, ylim=ylim)
+    graph_distance_distribution(
+        distance_type=DistanceType.Minkowski3, n_bins=n_bins, location=location, overwrite=overwrite, ylim=ylim)
+    graph_distance_distribution(
+        distance_type=DistanceType.Euclidean, n_bins=n_bins, location=location, overwrite=overwrite, ylim=ylim)
 
     # Run each of the analyses in turn
-    model_wordsim(location=save_dir, overwrite=overwrite)
-    model_simlex(location=save_dir, overwrite=overwrite)
-    model_men(location=save_dir, overwrite=overwrite)
+    wordsim_data = model_wordsim(location=save_dir, overwrite=overwrite)
+    simlex_data  = model_simlex(location=save_dir, overwrite=overwrite)
+    men_data     = model_men(location=save_dir, overwrite=overwrite)
+
+    save_combined_pairs((wordsim_data, simlex_data, men_data), location=save_dir)
 
     # model_hebart(location=Path(save_dir, "Hebart"), overwrite=overwrite, n_perms=n_perms)
 
