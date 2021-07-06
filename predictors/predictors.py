@@ -40,6 +40,9 @@ def add_lsa_predictor(df: DataFrame, word_key_cols: Tuple[str, str], lsa_path: P
         lsa_deets: DataFrame = read_csv(lsa_file, header=None)
     lsa_deets.columns = [key_col_1, key_col_2, _predictor_name]
 
+    # Duplicated rows causes the left merge to behave badly, so ensure we don't have any
+    lsa_deets.drop_duplicates(subset=[key_col_1, key_col_2], inplace=True)
+
     df = merge(df, lsa_deets, on=[key_col_1, key_col_2], how="left")
     return df
 
