@@ -393,20 +393,19 @@ if __name__ == '__main__':
     # TODO: make these CLI args
     save_dir = Path("/Users/caiwingfield/Box Sync/LANGBOOT Project/Manuscripts/Draft - Sensorimotor distance norms/Output/")
     overwrite = True
-    n_perms = 100_000
 
     # Graph distributions for each measure
-    location = Path(save_dir, "Figures")
+    figures_location = Path(save_dir, "Figures")
     n_bins = 20
     ylim = None
     graph_distance_distribution(
-        distance_type=DistanceType.cosine, n_bins=n_bins, location=location, overwrite=overwrite, ylim=ylim)
+        distance_type=DistanceType.cosine, n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
     graph_distance_distribution(
-        distance_type=DistanceType.correlation, n_bins=n_bins, location=location, overwrite=overwrite, ylim=ylim)
+        distance_type=DistanceType.correlation, n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
     graph_distance_distribution(
-        distance_type=DistanceType.Minkowski3, n_bins=n_bins, location=location, overwrite=overwrite, ylim=ylim)
+        distance_type=DistanceType.Minkowski3, n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
     graph_distance_distribution(
-        distance_type=DistanceType.Euclidean, n_bins=n_bins, location=location, overwrite=overwrite, ylim=ylim)
+        distance_type=DistanceType.Euclidean, n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
 
     # Run each of the analyses in turn
     wordsim_data = model_wordsim(location=save_dir, overwrite=overwrite)
@@ -415,9 +414,9 @@ if __name__ == '__main__':
 
     save_combined_pairs((wordsim_data, simlex_data, men_data), location=save_dir)
 
+    # n_perms = 100_000
     # model_hebart(location=Path(save_dir, "Hebart"), overwrite=overwrite, n_perms=n_perms)
 
-    save_full_pairwise_distances(location=Path("/Users/caiwingfield/Desktop"), distance_type=DistanceType.cosine,
-                                 overwrite=overwrite)
+    save_full_pairwise_distances(location=Path("/Users/caiwingfield/Desktop"), overwrite=overwrite)
 
     logger.info("Done!")
