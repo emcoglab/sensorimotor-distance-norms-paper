@@ -417,6 +417,6 @@ if __name__ == '__main__':
     # n_perms = 100_000
     # model_hebart(location=Path(save_dir, "Hebart"), overwrite=overwrite, n_perms=n_perms)
 
-    save_full_pairwise_distances(location=Path("/Users/caiwingfield/Desktop"), overwrite=overwrite)
+    save_full_pairwise_distances(location=save_dir, overwrite=overwrite)
 
     logger.info("Done!")
