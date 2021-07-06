@@ -8,7 +8,7 @@ from scipy.io import loadmat
 
 from linguistic_distributional_models.evaluation.association import WordsimAll, WordAssociationTest, SimlexSimilarity, \
     MenSimilarity
-from linguistic_distributional_models.utils.maths import DistanceType
+from linguistic_distributional_models.utils.maths import DistanceType, distance
 from predictors.aux import logger, logger_format, logger_dateformat, pos_dir, lsa_dir, hebart_dir
 from predictors.spose import SPOSE
 from predictors.predictors import add_wordnet_predictor, add_lsa_predictor, add_norms_overlap_predictor, \
@@ -335,6 +335,35 @@ def save_combined_pairs(dfs: Iterable[DataFrame], location: Path) -> None:
         combined_data.to_csv(f, header=True, index=False)
 
 
+def save_full_pairwise_distances(location: Path, distance_type: DistanceType, overwrite: bool):
+    logger.info("Computing all distance pairs")
+    sensorimotor_norms = SensorimotorNorms()
+    target_filename = "all_distances.csv"
+    if Path(location, target_filename).exists() and not overwrite:
+        logger.info(f"File {target_filename} exists, skipping.")
+        return
+    csv_path = Path(location, f"{target_filename}.incomplete")
+    with csv_path.open("w") as f:
+        i = 0
+        for i1, concept_1 in enumerate(sensorimotor_norms.iter_words()):
+            for i2, concept_2 in enumerate(sensorimotor_norms.iter_words()):
+                # Don't double-count: just the ltv (diagonal is fine)
+                if i1 > i2:
+                    continue
+                if concept_1 == concept_2:
+                    d = 0
+                else:
+                    v1 = sensorimotor_norms.vector_for_word(concept_1)
+                    v2 = sensorimotor_norms.vector_for_word(concept_2)
+                    d = distance(v1, v2, distance_type=distance_type)
+                f.write(f"{concept_1},{concept_2},{d}\n")
+                i += 1
+                if i % 10_000 == 0:
+                    logger.info(f"\tDone {i:,} word pairs (of approx 800,000,000)")
+    # Move into place
+    csv_path.rename(Path(location, target_filename))
+
+
 if __name__ == '__main__':
     basicConfig(format=logger_format, datefmt=logger_dateformat, level=INFO)
 
@@ -367,5 +396,8 @@ if __name__ == '__main__':
     save_combined_pairs((wordsim_data, simlex_data, men_data), location=save_dir)
 
     # model_hebart(location=Path(save_dir, "Hebart"), overwrite=overwrite, n_perms=n_perms)
+
+    save_full_pairwise_distances(location=Path("/Users/caiwingfield/Desktop"), distance_type=DistanceType.cosine,
+                                 overwrite=overwrite)
 
     logger.info("Done!")
