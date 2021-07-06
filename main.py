@@ -320,7 +320,7 @@ if __name__ == '__main__':
     seed(1)
 
     # TODO: make these CLI args
-    save_dir = Path("/Users/caiwingfield/Box Sync/LANGBOOT Project/Manuscripts/Sensorimotor proximity/Output/")
+    save_dir = Path("/Users/caiwingfield/Box Sync/LANGBOOT Project/Manuscripts/Draft - Sensorimotor distance norms/Output/")
     overwrite = True
     n_perms = 100_000
 

@@ -44,6 +44,9 @@ class WordnetAssociation(Enum):
             # Avoid divide-by-zero errors
             if similarity == 0:
                 return None
+            # Avoid nearly divide-by-zero errors
+            if similarity < 0.000001:
+                return None
             # Match the formula of Maki et al. (2004)
             return 1 / similarity
         else:
