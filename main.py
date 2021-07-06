@@ -5,10 +5,12 @@ from typing import Tuple, Iterable
 
 from pandas import DataFrame, concat, read_csv
 from scipy.io import loadmat
+from scipy.spatial.distance import cdist
 
 from linguistic_distributional_models.evaluation.association import WordsimAll, WordAssociationTest, SimlexSimilarity, \
     MenSimilarity
-from linguistic_distributional_models.utils.maths import DistanceType, distance
+from linguistic_distributional_models.utils.logging import print_progress
+from linguistic_distributional_models.utils.maths import DistanceType
 from predictors.aux import logger, logger_format, logger_dateformat, pos_dir, lsa_dir, hebart_dir
 from predictors.spose import SPOSE
 from predictors.predictors import add_wordnet_predictor, add_lsa_predictor, add_norms_overlap_predictor, \
@@ -335,33 +337,51 @@ def save_combined_pairs(dfs: Iterable[DataFrame], location: Path) -> None:
         combined_data.to_csv(f, header=True, index=False)
 
 
-def save_full_pairwise_distances(location: Path, distance_type: DistanceType, overwrite: bool):
-    logger.info("Computing all distance pairs")
+def save_full_pairwise_distances(location: Path, overwrite: bool):
+    WORD_1 = "Word 1"
+    WORD_2 = "Word 2"
+    DISTANCE = "Distance"
+
     sensorimotor_norms = SensorimotorNorms()
-    target_filename = "all_distances.csv"
-    if Path(location, target_filename).exists() and not overwrite:
-        logger.info(f"File {target_filename} exists, skipping.")
+
+    logger.info("Computing all distance pairs")
+
+    final_filename = "all_distances.csv"
+    if Path(location, final_filename).exists() and not overwrite:
+        logger.info(f"File {final_filename} exists, skipping.")
         return
-    csv_path = Path(location, f"{target_filename}.incomplete")
-    with csv_path.open("w") as f:
-        i = 0
-        for i1, concept_1 in enumerate(sensorimotor_norms.iter_words()):
-            for i2, concept_2 in enumerate(sensorimotor_norms.iter_words()):
-                # Don't double-count: just the ltv (diagonal is fine)
-                if i1 > i2:
-                    continue
-                if concept_1 == concept_2:
-                    d = 0
-                else:
-                    v1 = sensorimotor_norms.vector_for_word(concept_1)
-                    v2 = sensorimotor_norms.vector_for_word(concept_2)
-                    d = distance(v1, v2, distance_type=distance_type)
-                f.write(f"{concept_1},{concept_2},{d}\n")
-                i += 1
-                if i % 10_000 == 0:
-                    logger.info(f"\tDone {i:,} word pairs (of approx 800,000,000)")
+
+    temporary_csv_path = Path(location, f"{final_filename}.incomplete")
+
+    all_words = sorted(sensorimotor_norms.iter_words())
+
+    with temporary_csv_path.open("w") as temp_file:
+        # Write the header
+        temp_file.write(f"{WORD_1},{WORD_2},{DISTANCE}")
+        for word_i, word in enumerate(all_words):
+
+            # Only the LTV, don't double-count (diagonal is fine)
+            other_words = all_words[word_i:]
+
+            # Pairwise distances for this word and all other (not yet seen, i.e. ltv-only) words
+            distances = cdist(
+                sensorimotor_norms.vector_for_word(word).reshape(1, -1),
+                sensorimotor_norms.matrix_for_words(other_words),
+                'cosine').reshape(-1)
+
+            these_distances = DataFrame()
+            these_distances[WORD_2] = other_words
+            these_distances[DISTANCE] = distances
+            these_distances[WORD_1] = word
+
+            # Append this block of distances
+            these_distances[[WORD_1, WORD_2, DISTANCE]].to_csv(temp_file, header=False, index=False)
+
+            print_progress(word_i, len(all_words))
+    print_progress(len(all_words), len(all_words))
+
     # Move into place
-    csv_path.rename(Path(location, target_filename))
+    temporary_csv_path.rename(Path(location, final_filename))
 
 
 if __name__ == '__main__':
