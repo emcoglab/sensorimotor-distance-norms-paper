@@ -9,5 +9,5 @@ data/hebart/*
 !data/hebart/words18common.txt
 !data/hebart/words46lsa.txt
 
-!data/buchanan/
+!data/buchanan
 data/buchanan/*
