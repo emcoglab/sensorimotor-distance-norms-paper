@@ -6,3 +6,4 @@ numpy
 scipy
 sklearn
 pandas
+pyyaml

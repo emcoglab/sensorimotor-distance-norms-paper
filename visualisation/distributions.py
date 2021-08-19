@@ -1,8 +1,9 @@
 from pathlib import Path
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict
 
+import yaml
 from matplotlib.axes import Axes
-from numpy import array, zeros, arange, repeat, linspace, savetxt, loadtxt, histogram, inf
+from numpy import array, zeros, arange, repeat, linspace, savetxt, loadtxt, histogram, inf, nditer, sqrt
 from scipy.spatial import distance_matrix as minkowski_distance_matrix
 from scipy.spatial.distance import cdist as distance_matrix
 from matplotlib import pyplot
@@ -14,7 +15,7 @@ from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
 sn = SensorimotorNorms()
 
 
-def bin_distances(bins, distance_type) -> Tuple[array, float, float]:
+def bin_distances(bins, distance_type) -> Tuple[array, float, float, float, float]:
     """
     Get all pairwise distances from the model and graph a histogram distribution using the specified bins.
 
@@ -24,6 +25,8 @@ def bin_distances(bins, distance_type) -> Tuple[array, float, float]:
         binned distances (array of counts of distances for each bin),
         min attained distance
         max attained distance
+        mean distance
+        sd distance
     """
 
     n_bins = len(bins) - 1
@@ -38,6 +41,9 @@ def bin_distances(bins, distance_type) -> Tuple[array, float, float]:
                              # floats to avoid broadcasting errors on divides below.
                              # We'll cast to int later
                              dtype=float)
+    count = 0
+    cumulative_mean = 0  # will store the cumulatively computed mean
+    cumulative_ssd = 0  # will store the cumulatively computed sum of squared differences from the mean
     for i, word in enumerate(all_words):
         if i % 1_000 == 0:
             logger.info(f"Done {i:,} words")
@@ -59,6 +65,16 @@ def bin_distances(bins, distance_type) -> Tuple[array, float, float]:
                                     distances_this_word[arange(len(distances_this_word)) != i].min())
         max_attained_distance = max(max_attained_distance, distances_this_word.max())
 
+        # Mean and SD for streaming data
+        # Thanks to https://nestedsoftware.com/2018/03/20/calculating-a-moving-average-on-streaming-data-5a7k.22879.html
+        for d in nditer(distances_this_word):
+            count += 1
+            mean_differential = (d - cumulative_mean) / count
+            new_mean = cumulative_mean + mean_differential
+            d2_increment = (d - new_mean) * (d - cumulative_mean)
+            cumulative_mean = new_mean
+            cumulative_ssd += d2_increment
+
     # We've double-counted many of the distances by matching word X with all words (including Y) and word Y with all
     # words (including X). However we haven't double-counted the diagonal (each word X was matched with all words,
     # including X, but only once).
@@ -73,9 +89,26 @@ def bin_distances(bins, distance_type) -> Tuple[array, float, float]:
         # And all of the identity pairs
         + n_identity_pairs
     )
-
     assert (binned_distances == binned_distances.astype(int)).all()
-    return binned_distances.astype(int), min_attained_distance, max_attained_distance
+
+    # Similarity for the mean, we've double-counted lots, but not including the diagonal zeros.
+    # So we need to adjust the mean accordingly:
+    n_ltv_pairs = len(all_words) * (len(all_words) + 1) / 2  # including the diagonal
+    mean = (cumulative_mean
+            # `count` is the total number of elements in the square distance matrix, so multiplying gives us the sum.
+            * count
+            # We only want to single-count entries for the sum, and the diagonal entries didn't contribute, so we can
+            # just divide by 2.
+            / 2
+            # Finally we divide by the number of single-counted ltv entries, INCLUDING the diagonal (the +1).
+            / n_ltv_pairs)
+
+    # And for the SD, we also have double-counted just the non-zero entries.
+    # cumulative_ssd holds the sum of squared distances from the mean. we can just halve this to get the ssd of the
+    # single-counted entries, and complete the rest of the sample sd formula as required.
+    sd = sqrt(cumulative_ssd / 2 / (n_ltv_pairs - 1))
+
+    return binned_distances.astype(int), min_attained_distance, max_attained_distance, mean, sd
 
 
 def style_histplot(ax: Axes, xlim: Tuple[float, float], ylim: Optional[Tuple[float, float]]):
@@ -100,8 +133,7 @@ def graph_distance_distribution(distance_type: DistanceType, n_bins: int, locati
 
     figure_save_path = Path(location, f"distance distribution {distance_type.name} {n_bins} bins.svg")
     distribution_save_path = Path(location, f"distance distribution {distance_type.name} {n_bins} bins.txt")
-    min_attained_distances_path = Path(location, f"distance {distance_type.name} minimum attained.txt")
-    max_attained_distances_path = Path(location, f"distance {distance_type.name} maximum attained.txt")
+    descriptive_stats_path = Path(location, f"distance {distance_type.name} descriptive.yaml")
 
     min_distance = 0
     if distance_type == distance_type.cosine:
@@ -124,21 +156,27 @@ def graph_distance_distribution(distance_type: DistanceType, n_bins: int, locati
         logger.warning(f"{distribution_save_path} exists, skipping")
         with distribution_save_path.open("r") as distribution_file:
             binned_distances = loadtxt(distribution_file)
-        with min_attained_distances_path.open("r") as min_file:
-            min_attained_distance = float(loadtxt(min_file))
-        with max_attained_distances_path.open("r") as max_file:
-            max_attained_distance = float(loadtxt(max_file))
+        with descriptive_stats_path.open("r") as descriptive_file:
+            descriptive_stats: Dict[str, float] = yaml.load(descriptive_file, yaml.SafeLoader)
+        min_attained_distance = descriptive_stats["Minimum attained distance"]
+        max_attained_distance = descriptive_stats["Maximum attained distance"]
+        mean_distance         = descriptive_stats["Mean distance"]
+        sd_distance           = descriptive_stats["SD distance"]
     else:
-        binned_distances, min_attained_distance, max_attained_distance = bin_distances(bins, distance_type)
+        binned_distances, min_attained_distance, max_attained_distance, mean_distance, sd_distance = bin_distances(bins, distance_type)
         with distribution_save_path.open("w") as distribution_file:
             savetxt(distribution_file, binned_distances)
-        with min_attained_distances_path.open("w") as min_file:
-            savetxt(min_file, array([min_attained_distance]))
-        with max_attained_distances_path.open("w") as max_file:
-            savetxt(max_file, array([max_attained_distance]))
+        with descriptive_stats_path.open("w") as descriptive_file:
+            yaml.dump({
+                "Minimum attained distance": float(min_attained_distance),
+                "Maximum attained distance": float(max_attained_distance),
+                "Mean distance":             float(mean_distance),
+                "SD distance":               float(sd_distance),
+            }, descriptive_file, yaml.SafeDumper)
 
     logger.info(f"Max theoretical pairwise {distance_type.name} distance between concepts: {max_distance}")
     logger.info(f"Attained {distance_type.name} distance range: [{min_attained_distance}, {max_attained_distance}]")
+    logger.info(f"Mean (SD) {distance_type.name} distance: {mean_distance} ({sd_distance})")
 
     fig, ax = pyplot.subplots(tight_layout=True)
     ax.hist(

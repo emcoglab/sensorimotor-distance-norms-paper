@@ -54,5 +54,6 @@ class BuchananFeatureNorms:
             # zero
             return 0
 
+
 # Shared copy
 BUCHANAN_FEATURE_NORMS = BuchananFeatureNorms()
