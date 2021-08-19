@@ -11,3 +11,6 @@ data/hebart/*
 
 !data/buchanan
 data/buchanan/*
+
+!data/concreteness
+data/concreteness/*

@@ -384,6 +384,45 @@ def save_full_pairwise_distances(location: Path, overwrite: bool):
     temporary_csv_path.rename(Path(location, final_filename))
 
 
+def label_with_concreteness(df: DataFrame, location: Path, overwrite: bool):
+
+    save_path = Path(location, "simlex-with-concreteness.csv")
+
+    if save_path.exists() and not overwrite:
+        logger.warning(f"{save_path.as_posix()} exists, skipping")
+        return
+
+    concreteness_df = read_csv(
+        Path(Path(__file__).parent, "data", "concreteness", "13428_2013_403_MOESM1_ESM.csv").as_posix())
+    # Get first-word-in-pair concreteness rating
+    df = df.merge(
+        concreteness_df
+            .rename(columns={"Word": WordAssociationTest.TestColumn.word_1, "Conc.M": "Word 1 concreteness"})
+            [[WordAssociationTest.TestColumn.word_1, "Word 1 concreteness"]],
+        how="left", on=WordAssociationTest.TestColumn.word_1)
+    # Get second-word-in-pair concreteness rating
+    df = df.merge(
+        concreteness_df
+            .rename(columns={"Word": WordAssociationTest.TestColumn.word_2, "Conc.M": "Word 2 concreteness"})
+        [[WordAssociationTest.TestColumn.word_2, "Word 2 concreteness"]],
+        how="left", on=WordAssociationTest.TestColumn.word_2)
+
+    def pair_type(row) -> str:
+        # Concrete defined to be >=3 on the 1–5 Brysbaert scale. <3 is therefore abstract
+        word_1_is_concrete: bool = row["Word 1 concreteness"] >= 3
+        word_2_is_concrete: bool = row["Word 2 concreteness"] >= 3
+        if word_1_is_concrete and word_2_is_concrete:
+            return "concrete_concrete"
+        if (not word_1_is_concrete) and (not word_2_is_concrete):
+            return "abstract_abstract"
+        return"mixed"
+
+    df["Pair type"] = df.apply(pair_type, axis=1)
+
+    with save_path.open("w") as f:
+        df.to_csv(f, index=False)
+
+
 if __name__ == '__main__':
     basicConfig(format=logger_format, datefmt=logger_dateformat, level=INFO)
 
@@ -411,6 +450,9 @@ if __name__ == '__main__':
     wordsim_data = model_wordsim(location=save_dir, overwrite=overwrite)
     simlex_data  = model_simlex(location=save_dir, overwrite=overwrite)
     men_data     = model_men(location=save_dir, overwrite=overwrite)
+
+    # Simlex with concrete/abstract breakdown
+    label_with_concreteness(simlex_data, location=save_dir, overwrite=overwrite)
 
     save_combined_pairs((wordsim_data, simlex_data, men_data), location=save_dir)
 
