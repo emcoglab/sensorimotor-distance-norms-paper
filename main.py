@@ -41,6 +41,8 @@ def common_similarity_modelling(df: DataFrame,
     """
 
     df.rename(columns={WordAssociationTest.TestColumn.association_strength: dv_col}, inplace=True)
+    logger.info("Adding concreteness labels")
+    df = label_with_concreteness(df)
     logger.info("Adding predictors")
     df = add_wordnet_predictor(
         df,
@@ -392,16 +394,11 @@ def save_full_pairwise_distances(location: Path, overwrite: bool):
     temporary_csv_path.rename(Path(location, final_filename))
 
 
-def label_with_concreteness(df: DataFrame, location: Path, overwrite: bool):
-
-    save_path = Path(location, "simlex-with-concreteness.csv")
-
-    if save_path.exists() and not overwrite:
-        logger.warning(f"{save_path.as_posix()} exists, skipping")
-        return
+def label_with_concreteness(df: DataFrame) -> DataFrame:
 
     concreteness_df = read_csv(
         Path(Path(__file__).parent, "data", "concreteness", "13428_2013_403_MOESM1_ESM.csv").as_posix())
+
     # Get first-word-in-pair concreteness rating
     df = df.merge(
         concreteness_df
@@ -427,8 +424,7 @@ def label_with_concreteness(df: DataFrame, location: Path, overwrite: bool):
 
     df["Pair type"] = df.apply(pair_type, axis=1)
 
-    with save_path.open("w") as f:
-        df.to_csv(f, index=False)
+    return df
 
 
 if __name__ == '__main__':
@@ -458,9 +454,6 @@ if __name__ == '__main__':
     wordsim_data = model_wordsim(location=save_dir, overwrite=overwrite)
     simlex_data  = model_simlex(location=save_dir, overwrite=overwrite)
     men_data     = model_men(location=save_dir, overwrite=overwrite)
-
-    # Simlex with concrete/abstract breakdown
-    label_with_concreteness(simlex_data, location=save_dir, overwrite=overwrite)
 
     save_combined_pairs((wordsim_data, simlex_data, men_data), location=save_dir)
 
