@@ -106,7 +106,7 @@ def add_wordnet_predictor(df: DataFrame,
     def calc_jiang_conrath_distance(row):
         nonlocal i
         i += 1
-        print_progress(i, n, prefix=f"WordNet {association_type.name}: ", bar_length=200)
+        print_progress(i, n, prefix=f"WordNet {association_type.name}: ")
 
         # Get words
         w1 = row[key_col_1]
@@ -147,7 +147,7 @@ def add_norms_overlap_predictor(df: DataFrame, word_key_cols: Tuple[str, str]):
     def calc_norms_overlap(row):
         nonlocal i
         i += 1
-        print_progress(i, n, prefix=f"Buchanan overlap: ", bar_length=200)
+        print_progress(i, n, prefix=f"Buchanan overlap: ")
         try:
             return BUCHANAN_FEATURE_NORMS.overlap_between(row[key_col_1], row[key_col_2])
         except KeyError:
@@ -190,7 +190,7 @@ def add_sensorimotor_predictor(df: DataFrame, word_key_cols: Tuple[str, str], di
     def calc_sensorimotor_distance(row):
         nonlocal i
         i += 1
-        print_progress(i, n, prefix=f"Sensorimotor {distance_type.name}: ", bar_length=200)
+        print_progress(i, n, prefix=f"Sensorimotor {distance_type.name}: ")
         try:
             v1 = _sensorimotor_norms.vector_for_word(row[key_col_1])
             v2 = _sensorimotor_norms.vector_for_word(row[key_col_2])

@@ -24,6 +24,7 @@ from visualisation.distributions import graph_distance_distribution
 
 def common_similarity_modelling(df: DataFrame,
                                 word_key_cols: Tuple[str, str],
+                                dv_col: str,
                                 pos_path: Path,
                                 lsa_path: Path,
                                 save_path: Path):
@@ -32,12 +33,14 @@ def common_similarity_modelling(df: DataFrame,
 
     :param df:
     :param word_key_cols:
+    :param dv_col:
     :param pos_path:
     :param lsa_path:
     :param save_path:
     :return:
     """
 
+    df.rename(columns={WordAssociationTest.TestColumn.association_strength: dv_col}, inplace=True)
     logger.info("Adding predictors")
     df = add_wordnet_predictor(
         df,
@@ -83,6 +86,7 @@ def model_wordsim(location: Path, overwrite: bool) -> DataFrame:
         # Load data from source:
         df=WordsimAll().associations_to_dataframe(),
         word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2),
+        dv_col = "WordSim similarity judgement",
         lsa_path=Path(lsa_dir, "wordsim-lsa.csv"),
         pos_path=Path(pos_dir, "wordsim-pos.tab"),
         save_path=save_path)
@@ -110,6 +114,7 @@ def model_simlex(location: Path, overwrite: bool) -> DataFrame:
         # Load data from source:
         df=SimlexSimilarity().associations_to_dataframe(),
         word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2),
+        dv_col="Simlex similarity judgement",
         lsa_path=Path(lsa_dir, "simlex-lsa.csv"),
         pos_path=Path(pos_dir, "simlex-pos.tab"),
         save_path=save_path)
@@ -136,6 +141,7 @@ def model_men(location: Path, overwrite: bool) -> DataFrame:
         # Load data from source:
         df=MenSimilarity().associations_to_dataframe(),
         word_key_cols=(WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2),
+        dv_col="MEN similarity judgement",
         lsa_path=Path(lsa_dir, "men-lsa.csv"),
         pos_path=Path(pos_dir, "men-pos.tab"),
         save_path=save_path)
@@ -327,11 +333,13 @@ def model_hebart(location: Path, overwrite: bool, n_perms: int) -> None:
 
 
 def save_combined_pairs(dfs: Iterable[DataFrame], location: Path) -> None:
-    combined_data: DataFrame = concat(dfs)
+    combined_data: DataFrame = concat(dfs,
+                                      # The DV columns aren't comparable between datasets, and can't be used for the
+                                      # grand correlation. However they all have different names so we can just exclude
+                                      # them automatically.
+                                      join='inner')
     combined_data.drop_duplicates(subset=[WordAssociationTest.TestColumn.word_1, WordAssociationTest.TestColumn.word_2],
                                   inplace=True)
-    # This isn't comparable between datasets, and isn't used for the gramd correlation
-    del combined_data[WordAssociationTest.TestColumn.association_strength]
 
     with Path(location, "combined.csv").open("w") as f:
         combined_data.to_csv(f, header=True, index=False)
