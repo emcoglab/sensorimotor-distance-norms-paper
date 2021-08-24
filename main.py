@@ -60,6 +60,18 @@ def common_similarity_modelling(df: DataFrame,
         df,
         word_key_cols=word_key_cols,
         distance_type=DistanceType.cosine)
+    df = add_sensorimotor_predictor(
+        df,
+        word_key_cols=word_key_cols,
+        distance_type=DistanceType.correlation)
+    df = add_sensorimotor_predictor(
+        df,
+        word_key_cols=word_key_cols,
+        distance_type=DistanceType.Euclidean)
+    df = add_sensorimotor_predictor(
+        df,
+        word_key_cols=word_key_cols,
+        distance_type=DistanceType.Minkowski3)
 
     logger.info(f"Saving results to {save_path}")
     with save_path.open("w") as save_file:

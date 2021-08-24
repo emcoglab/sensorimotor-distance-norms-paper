@@ -2,6 +2,8 @@ __pycache__/
 .idea/
 venv/
 
+scratch.py
+
 !data/hebart
 data/hebart/*
 # Files to include
