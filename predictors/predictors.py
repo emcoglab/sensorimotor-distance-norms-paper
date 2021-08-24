@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Tuple, Dict, Optional
 
 # noinspection PyProtectedMember
-from pandas import DataFrame, read_csv, merge
+from pandas import DataFrame, read_csv, merge, concat
 
 from linguistic_distributional_models.utils.logging import print_progress
 from linguistic_distributional_models.utils.maths import distance, DistanceType
@@ -39,6 +39,10 @@ def add_lsa_predictor(df: DataFrame, word_key_cols: Tuple[str, str], lsa_path: P
     with lsa_path.open("r") as lsa_file:
         lsa_deets: DataFrame = read_csv(lsa_file, header=None)
     lsa_deets.columns = [key_col_1, key_col_2, _predictor_name]
+    # Don't know which way the pair goes, so add the flipped versions
+    lsa_deets_swapped = lsa_deets.copy()
+    lsa_deets_swapped.columns = [key_col_2, key_col_1, _predictor_name]
+    lsa_deets = concat([lsa_deets, lsa_deets_swapped], ignore_index=True, join="inner")
 
     # Duplicated rows causes the left merge to behave badly, so ensure we don't have any
     lsa_deets.drop_duplicates(subset=[key_col_1, key_col_2], inplace=True)
@@ -192,8 +196,8 @@ def add_sensorimotor_predictor(df: DataFrame, word_key_cols: Tuple[str, str], di
         i += 1
         print_progress(i, n, prefix=f"Sensorimotor {distance_type.name}: ")
         try:
-            v1 = _sensorimotor_norms.vector_for_word(row[key_col_1])
-            v2 = _sensorimotor_norms.vector_for_word(row[key_col_2])
+            v1 = _sensorimotor_norms.vector_for_word(row[key_col_1].lower())
+            v2 = _sensorimotor_norms.vector_for_word(row[key_col_2].lower())
             return distance(v1, v2, distance_type=distance_type)
         except WordNotInNormsError:
             return None
