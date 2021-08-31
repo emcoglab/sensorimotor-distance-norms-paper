@@ -4,19 +4,15 @@ from random import seed
 from typing import Tuple, Iterable
 
 from pandas import DataFrame, concat, read_csv
-from scipy.io import loadmat
 from scipy.spatial.distance import cdist
 
 from linguistic_distributional_models.evaluation.association import WordsimAll, WordAssociationTest, SimlexSimilarity, \
     MenSimilarity
 from linguistic_distributional_models.utils.logging import print_progress
 from linguistic_distributional_models.utils.maths import DistanceType
-from predictors.aux import logger, logger_format, logger_dateformat, pos_dir, lsa_dir, hebart_dir
-from predictors.spose import SPOSE
+from predictors.aux import logger, logger_format, logger_dateformat, pos_dir, lsa_dir
 from predictors.predictors import add_wordnet_predictor, add_lsa_predictor, add_norms_overlap_predictor, \
     add_sensorimotor_predictor
-from predictors.rsa import compute_buchanan_sm, RDM, SimilarityMatrix, compute_lsa_sm, compute_wordnet_sm, \
-    compute_sensorimotor_rdm, subset_flag
 from predictors.wordnet import WordnetAssociation
 from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
 from visualisation.distributions import graph_distance_distribution
@@ -163,189 +159,6 @@ def model_men(location: Path, overwrite: bool) -> DataFrame:
     return men_data
 
 
-def save_raw_values(reference_rdm: RDM, comparison_rdm: RDM, save_path: Path, overwrite: bool):
-    """
-    Saves the raw LTV values from two RDMs into a 3-column CSV file so they can be analysed with other software
-    (e.g. JASP). The columns are: values from reference RDM; values from comparison RDM; binary flag which is True just
-    when both (original matrix's) row and columns were in the common set of 18 words.
-
-    :param reference_rdm:
-    :param comparison_rdm:
-    :param save_path:
-    :param overwrite:
-    :return:
-    """
-    assert reference_rdm.labels == comparison_rdm.labels
-
-    if save_path.exists() and not overwrite:
-        logger.warning(f"{save_path} exists, skipping")
-        return
-
-    save_path.parent.mkdir(exist_ok=True)
-    with save_path.open("w") as save_file:
-        DataFrame.from_dict({
-            "Reference RDM values": reference_rdm.triangular_values,
-            "Comparison RDM values": comparison_rdm.triangular_values,
-            "In common 18": subset_flag(reference_rdm, subset_labels=SPOSE.words_common_18).triangular_values,
-        }).to_csv(save_file, header=True, index=False)
-
-
-def model_hebart(location: Path, overwrite: bool, n_perms: int) -> None:
-    """
-    Model the Hebart et al. participant RDMs using a suite of predictors. In each case, use their method of modelling
-    the choice-probability similarity matrix using a mean softmax transform of the predictor's similarity matrix.
-
-    :param location: Where to save the results. Raw LTV RDM values will be saved so that JASP (etc.) can be used to
-        perform more rigorous statistical testing.
-    :param overwrite: Whether to overwrite existing results.
-    :param n_perms: How many permutations to use for nonparametric NHST.
-    """
-
-    results_path = Path(location, "hebart_results.csv")
-
-    # TODO: (minor) this doesn't really respect the "overwrite" flag properly as it will prevent raw values being saved
-    #  below.
-    if results_path.exists() and not overwrite:
-        logger.warning(f"{results_path} exists, skipping")
-        return
-
-    logger.info(f"Hebart modelling ({n_perms:,} permutations)")
-
-    results = []
-
-    # Reference RDM
-    rdm_participants = RDM(matrix=loadmat(Path(hebart_dir, "RDM48_triplet.mat"))["RDM48_triplet"],
-                           labels=SPOSE.words_select_48)
-
-    # Hebart's SPOSE embedding
-    rdm_spose = RDM.from_similarity_matrix(
-        SimilarityMatrix.mean_softmax_probability_matrix(
-            SimilarityMatrix.by_dotproduct(data_matrix=SPOSE.matrix_49d, labels=SPOSE.words_all),
-            subset_labels=SPOSE.words_select_48))
-    rdm_spose_top11 = RDM.from_similarity_matrix(
-        SimilarityMatrix.mean_softmax_probability_matrix(
-            SimilarityMatrix.by_dotproduct(data_matrix=SPOSE.matrix_49d[:, :11], labels=SPOSE.words_all),
-            subset_labels=SPOSE.words_select_48))
-    rdm_spose_bottom11 = RDM.from_similarity_matrix(
-        SimilarityMatrix.mean_softmax_probability_matrix(
-            SimilarityMatrix.by_dotproduct(data_matrix=SPOSE.matrix_49d[:, -11:], labels=SPOSE.words_all),
-            subset_labels=SPOSE.words_select_48))
-    results.extend([
-        ("Participants", "SPOSE",
-         48, *rdm_participants
-         .correlate_with_nhst(rdm_spose, n_perms=n_perms)),
-        ("Participants", "SPOSE",
-         18, *rdm_participants.for_subset(SPOSE.words_common_18)
-         .correlate_with_nhst(rdm_spose.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
-        ("Participants", "SPOSE top-11",
-         48, *rdm_participants
-         .correlate_with_nhst(rdm_spose_top11, n_perms=n_perms)),
-        ("Participants", "SPOSE top-11",
-         18, *rdm_participants.for_subset(SPOSE.words_common_18)
-         .correlate_with_nhst(rdm_spose_top11.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
-        ("Participants", "SPOSE bottom-11",
-         48, *rdm_participants
-         .correlate_with_nhst(rdm_spose_bottom11, n_perms=n_perms)),
-        ("Participants", "SPOSE bottom-11",
-         18, *rdm_participants.for_subset(SPOSE.words_common_18)
-         .correlate_with_nhst(rdm_spose_bottom11.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
-    ])
-    save_raw_values(rdm_participants, rdm_spose, Path(location, "spose.csv"), overwrite)
-    save_raw_values(rdm_participants, rdm_spose_top11, Path(location, "spose_top11.csv"), overwrite)
-    save_raw_values(rdm_participants, rdm_spose_bottom11, Path(location, "spose_bottom11.csv"), overwrite)
-
-    # LSA
-    rdm_lsa = RDM.from_similarity_matrix(
-        SimilarityMatrix.mean_softmax_probability_matrix(compute_lsa_sm(), SPOSE.words_lsa_46))
-    results.extend([
-        ("Participants", "LSA softmax",
-         46, *rdm_participants.for_subset(SPOSE.words_lsa_46)
-         .correlate_with_nhst(rdm_lsa, n_perms=n_perms)),
-        ("Participants", "LSA softmax",
-         18, *rdm_participants.for_subset(SPOSE.words_common_18)
-         .correlate_with_nhst(rdm_lsa.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
-    ])
-    save_raw_values(rdm_participants.for_subset(SPOSE.words_lsa_46), rdm_lsa, Path(location, "lsa.csv"), overwrite)
-
-    # Wordnet
-    rdm_wordnet_jcn = RDM.from_similarity_matrix(
-        SimilarityMatrix.mean_softmax_probability_matrix(compute_wordnet_sm(association_type=WordnetAssociation.JiangConrath)))
-    rdm_wordnet_res = RDM.from_similarity_matrix(
-        SimilarityMatrix.mean_softmax_probability_matrix(compute_wordnet_sm(association_type=WordnetAssociation.Resnik)))
-    results.extend([
-        ("Participants", f"Wordnet {WordnetAssociation.JiangConrath.name}",
-         48, *rdm_participants
-         .correlate_with_nhst(rdm_wordnet_jcn, n_perms=n_perms)),
-        ("Participants", f"Wordnet {WordnetAssociation.JiangConrath.name}",
-         18, *rdm_participants.for_subset(SPOSE.words_common_18)
-         .correlate_with_nhst(rdm_wordnet_jcn.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
-    ])
-    results.extend([
-        ("Participants", f"Wordnet {WordnetAssociation.Resnik.name}",
-         48, *rdm_participants
-         .correlate_with_nhst(rdm_wordnet_res, n_perms=n_perms)),
-        ("Participants", f"Wordnet {WordnetAssociation.Resnik.name}",
-         18, *rdm_participants.for_subset(SPOSE.words_common_18)
-         .correlate_with_nhst(rdm_wordnet_res.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
-    ])
-    save_raw_values(rdm_participants, rdm_wordnet_jcn, Path(location, f"wordnet {WordnetAssociation.JiangConrath.name}.csv"), overwrite)
-    save_raw_values(rdm_participants, rdm_wordnet_res, Path(location, f"wordnet {WordnetAssociation.Resnik.name}.csv"), overwrite)
-
-    # Buchanan
-    rdm_buchanan = RDM.from_similarity_matrix(
-        SimilarityMatrix.mean_softmax_probability_matrix(compute_buchanan_sm(), SPOSE.words_common_18))
-    results.extend([
-        ("Participants", "Buchanan feature overlap",
-         18, *rdm_participants.for_subset(SPOSE.words_common_18)
-         .correlate_with_nhst(rdm_buchanan, n_perms=n_perms))
-    ])
-    save_raw_values(rdm_participants.for_subset(SPOSE.words_common_18), rdm_buchanan, Path(location, "buchanan.csv"), overwrite)
-
-    # Sensorimotor
-    sensorimotor_distance = DistanceType.cosine
-    rdm_sensorimotor = RDM.from_similarity_matrix(
-        SimilarityMatrix.mean_softmax_probability_matrix(
-            SimilarityMatrix.from_rdm(compute_sensorimotor_rdm(distance_type=sensorimotor_distance))))
-    results.extend([
-        ("Participants", f"Sensorimotor {sensorimotor_distance.name}",
-         48, *rdm_participants
-         .correlate_with_nhst(rdm_sensorimotor, n_perms=n_perms)),
-        ("Participants", f"Sensorimotor {sensorimotor_distance.name}",
-         18, *rdm_participants.for_subset(SPOSE.words_common_18)
-         .correlate_with_nhst(rdm_sensorimotor.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
-    ])
-    save_raw_values(rdm_participants, rdm_sensorimotor, Path(location, "sensorimotor.csv"), overwrite)
-
-    # Sensorimotor 10-dim subspaces
-    for exclude_dimension in SensorimotorNorms().VectorColNames:
-        rdm_sensorimotor = RDM.from_similarity_matrix(
-            SimilarityMatrix.mean_softmax_probability_matrix(
-                SimilarityMatrix.from_rdm(compute_sensorimotor_rdm(distance_type=sensorimotor_distance,
-                                                                   exclude_dimension=exclude_dimension))))
-        results.extend([
-            ("Participants", f"Sensorimotor {sensorimotor_distance.name} excluding {exclude_dimension}",
-             48, *rdm_participants
-             .correlate_with_nhst(rdm_sensorimotor, n_perms=n_perms)),
-            ("Participants", f"Sensorimotor {sensorimotor_distance.name} excluding {exclude_dimension}",
-             18, *rdm_participants.for_subset(SPOSE.words_common_18)
-             .correlate_with_nhst(rdm_sensorimotor.for_subset(SPOSE.words_common_18), n_perms=n_perms)),
-        ])
-        save_raw_values(rdm_participants, rdm_sensorimotor,
-                        Path(location, f"sensorimotor_excluding_{exclude_dimension}.csv"), overwrite)
-
-    with results_path.open("w") as save_file:
-        DataFrame.from_records(
-            results,
-            columns=[
-                "Comparison LH",
-                "Comparison RH",
-                "N conditions",
-                "R-value",
-                f"P-value ({n_perms:_} permutations)",
-            ]
-        ).to_csv(save_file, header=True, index=False)
-
-
 def save_combined_pairs(dfs: Iterable[DataFrame], location: Path) -> None:
     combined_data: DataFrame = concat(dfs,
                                       # The DV columns aren't comparable between datasets, and can't be used for the
@@ -468,9 +281,6 @@ if __name__ == '__main__':
     men_data     = model_men(location=save_dir, overwrite=overwrite)
 
     save_combined_pairs((wordsim_data, simlex_data, men_data), location=save_dir)
-
-    # n_perms = 100_000
-    # model_hebart(location=Path(save_dir, "Hebart"), overwrite=overwrite, n_perms=n_perms)
 
     # This makes a 30GB file so don't run it unless you really want to
     # save_full_pairwise_distances(location=save_dir, overwrite=overwrite)
