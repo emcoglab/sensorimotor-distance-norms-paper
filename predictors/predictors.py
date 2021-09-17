@@ -16,6 +16,25 @@ from .wordnet import WordnetAssociation
 _sensorimotor_norms = SensorimotorNorms()
 
 
+class PredictorName:
+
+    @staticmethod
+    def lsa():
+        return "LSA"
+
+    @staticmethod
+    def wordnet(for_association_type: WordnetAssociation):
+        return f"WordNet association ({for_association_type.name})"
+
+    @staticmethod
+    def feature_overlap():
+        return "Buchanan root cosine overlap"
+
+    @staticmethod
+    def sensorimotor_distance(for_distance_type: DistanceType):
+        return f"Sensorimotor distance ({for_distance_type.name})"
+
+
 def add_lsa_predictor(df: DataFrame, word_key_cols: Tuple[str, str], lsa_path: Path) -> DataFrame:
     """
     Adds a column of LSA distances to the specified dataframe.
@@ -31,17 +50,16 @@ def add_lsa_predictor(df: DataFrame, word_key_cols: Tuple[str, str], lsa_path: P
     :return:
         `df`, plus the "LSA" column.
     """
-    _predictor_name = "LSA"
 
     assert len(word_key_cols) == 2
     key_col_1, key_col_2 = word_key_cols
 
     with lsa_path.open("r") as lsa_file:
         lsa_deets: DataFrame = read_csv(lsa_file, header=None)
-    lsa_deets.columns = [key_col_1, key_col_2, _predictor_name]
+    lsa_deets.columns = [key_col_1, key_col_2, PredictorName.lsa()]
     # Don't know which way the pair goes, so add the flipped versions
     lsa_deets_swapped = lsa_deets.copy()
-    lsa_deets_swapped.columns = [key_col_2, key_col_1, _predictor_name]
+    lsa_deets_swapped.columns = [key_col_2, key_col_1, PredictorName.lsa()]
     lsa_deets = concat([lsa_deets, lsa_deets_swapped], ignore_index=True, join="inner")
 
     # Duplicated rows causes the left merge to behave badly, so ensure we don't have any
@@ -70,7 +88,6 @@ def add_wordnet_predictor(df: DataFrame,
     :return:
         `df` with the appropriately named wordneet distance column added.
     """
-    _predictor_name = f"WordNet association ({association_type.name})"
 
     assert len(word_key_cols) == 2
     key_col_1, key_col_2 = word_key_cols
@@ -107,10 +124,13 @@ def add_wordnet_predictor(df: DataFrame,
     i = 0
     n = df.shape[0]
 
-    def calc_jiang_conrath_distance(row):
+    def calc_wordnet_distance(row):
+        if association_type != WordnetAssociation.JiangConrath:
+            raise NotImplementedError()
+
         nonlocal i
         i += 1
-        print_progress(i, n, prefix=f"WordNet {association_type.name}: ")
+        print_progress(i, n, prefix=f"{PredictorName.wordnet(association_type)}: ")
 
         # Get words
         w1 = row[key_col_1]
@@ -122,12 +142,12 @@ def add_wordnet_predictor(df: DataFrame,
         )
 
     # noinspection PyTypeChecker
-    df[_predictor_name] = df.apply(calc_jiang_conrath_distance, axis=1)
+    df[PredictorName.wordnet(association_type)] = df.apply(calc_wordnet_distance, axis=1)
 
     return df
 
 
-def add_norms_overlap_predictor(df: DataFrame, word_key_cols: Tuple[str, str]):
+def add_feature_overlap_predictor(df: DataFrame, word_key_cols: Tuple[str, str]):
     """
     Adds a column of feature-overlap measures from the Buchanan feature norms to the supplied dataframe.
 
@@ -139,7 +159,6 @@ def add_norms_overlap_predictor(df: DataFrame, word_key_cols: Tuple[str, str]):
     :return:
         `df` plus an appropriately named feature overlap column.
     """
-    _predictor_name = "Buchanan root cosine overlap"
 
     assert len(word_key_cols) == 2
     key_col_1, key_col_2 = word_key_cols
@@ -148,7 +167,7 @@ def add_norms_overlap_predictor(df: DataFrame, word_key_cols: Tuple[str, str]):
     i = 0
     n = df.shape[0]
 
-    def calc_norms_overlap(row):
+    def calc_feature_overlap(row):
         nonlocal i
         i += 1
         print_progress(i, n, prefix=f"Buchanan overlap: ")
@@ -158,7 +177,7 @@ def add_norms_overlap_predictor(df: DataFrame, word_key_cols: Tuple[str, str]):
             return None
 
     # noinspection PyTypeChecker
-    df[_predictor_name] = df.apply(calc_norms_overlap, axis=1)
+    df[PredictorName.feature_overlap()] = df.apply(calc_feature_overlap, axis=1)
 
     return df
 
@@ -178,9 +197,8 @@ def add_sensorimotor_predictor(df: DataFrame, word_key_cols: Tuple[str, str], di
         `df` plus an appropriately named sensorimotor distance column added.
         If a column of the same name already existed, nothing will be added.
     """
-    _predictor_name = f"Sensorimotor distance ({distance_type.name})"
 
-    if _predictor_name in df.columns:
+    if PredictorName.sensorimotor_distance(distance_type) in df.columns:
         logger.info("Predictor already exists, skipping")
         return
 
@@ -203,6 +221,6 @@ def add_sensorimotor_predictor(df: DataFrame, word_key_cols: Tuple[str, str], di
             return None
 
     # noinspection PyTypeChecker
-    df[_predictor_name] = df.apply(calc_sensorimotor_distance, axis=1)
+    df[PredictorName.sensorimotor_distance(distance_type)] = df.apply(calc_sensorimotor_distance, axis=1)
 
     return df

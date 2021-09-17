@@ -3,7 +3,7 @@ from pathlib import Path
 from random import seed
 from typing import Tuple, Iterable
 
-from pandas import DataFrame, concat, read_csv
+from pandas import DataFrame, concat, read_csv, isna
 from scipy.spatial.distance import cdist
 
 from linguistic_distributional_models.evaluation.association import WordsimAll, WordAssociationTest, SimlexSimilarity, \
@@ -11,8 +11,8 @@ from linguistic_distributional_models.evaluation.association import WordsimAll, 
 from linguistic_distributional_models.utils.logging import print_progress
 from linguistic_distributional_models.utils.maths import DistanceType
 from predictors.aux import logger, logger_format, logger_dateformat, pos_dir, lsa_dir
-from predictors.predictors import add_wordnet_predictor, add_lsa_predictor, add_norms_overlap_predictor, \
-    add_sensorimotor_predictor
+from predictors.predictors import add_wordnet_predictor, add_lsa_predictor, add_feature_overlap_predictor, \
+    add_sensorimotor_predictor, PredictorName
 from predictors.wordnet import WordnetAssociation
 from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
 from visualisation.distributions import graph_distance_distribution
@@ -49,7 +49,7 @@ def common_similarity_modelling(df: DataFrame,
         df,
         word_key_cols=word_key_cols,
         lsa_path=lsa_path)
-    df = add_norms_overlap_predictor(
+    df = add_feature_overlap_predictor(
         df,
         word_key_cols=word_key_cols)
     df = add_sensorimotor_predictor(
@@ -68,6 +68,12 @@ def common_similarity_modelling(df: DataFrame,
         df,
         word_key_cols=word_key_cols,
         distance_type=DistanceType.Minkowski3)
+    df["Common to all predictors"] = (
+        ~isna(df[PredictorName.wordnet(WordnetAssociation.JiangConrath)])
+        & ~isna(df[PredictorName.lsa()])
+        & ~isna(df[PredictorName.feature_overlap()])
+        & ~isna(df[PredictorName.sensorimotor_distance(DistanceType.cosine)])  # Identical for all DistanceTypes
+    )
 
     logger.info(f"Saving results to {save_path}")
     with save_path.open("w") as save_file:
