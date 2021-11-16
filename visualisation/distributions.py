@@ -118,10 +118,10 @@ def style_histplot(ax: Axes, xlim: Tuple[float, float], ylim: Optional[Tuple[flo
         ax.set_ylim(ylim)
 
 
-def graph_distance_distribution(distance_type: DistanceType, n_bins: int, location: Path, overwrite: bool,
-                                ylim: Optional[Tuple[float, float]]):
+def graph_sensorimotor_distance_distribution(distance_type: DistanceType, n_bins: int, location: Path, overwrite: bool,
+                                             ylim: Optional[Tuple[float, float]]):
     """
-    Graph the distribution of distances among all pairs of concepts in the norms.
+    Graph the distribution of sensorimotor distances among all pairs of concepts in the norms.
 
     :param distance_type:
     :param n_bins:

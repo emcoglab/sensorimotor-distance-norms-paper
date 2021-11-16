@@ -202,7 +202,7 @@ def save_full_pairwise_distances(location: Path, overwrite: bool):
 
     with temporary_csv_path.open("w") as temp_file:
         # Write the header
-        temp_file.write(f"{WORD_1},{WORD_2},{DISTANCE}")
+        temp_file.write(f"{WORD_1},{WORD_2},{DISTANCE}\n")
         for word_i, word in enumerate(all_words):
 
             # Only the LTV, don't double-count (diagonal is fine)
@@ -276,13 +276,13 @@ if __name__ == '__main__':
     figures_location = Path(save_dir, "Figures")
     n_bins = 20
     ylim = None
-    graph_distance_distribution(
+    graph_sensorimotor_distance_distribution(
         distance_type=DistanceType.cosine, n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
-    graph_distance_distribution(
+    graph_sensorimotor_distance_distribution(
         distance_type=DistanceType.correlation, n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
-    graph_distance_distribution(
+    graph_sensorimotor_distance_distribution(
         distance_type=DistanceType.Minkowski3, n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
-    graph_distance_distribution(
+    graph_sensorimotor_distance_distribution(
         distance_type=DistanceType.Euclidean, n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
 
     # Run each of the analyses in turn
