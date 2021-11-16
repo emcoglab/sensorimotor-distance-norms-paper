@@ -9,6 +9,7 @@ from linguistic_distributional_models.utils.maths import distance, DistanceType
 from sensorimotor_norms.exceptions import WordNotInNormsError
 from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
 from .aux import logger
+from .mandera import MANDERA_CBOW
 from .wordnet import elex_to_wordnet
 from .buchanan import BUCHANAN_FEATURE_NORMS
 from .wordnet import WordnetAssociation
@@ -21,6 +22,10 @@ class PredictorName:
     @staticmethod
     def lsa():
         return "LSA"
+
+    @staticmethod
+    def mandera_cbow():
+        return "Mandera CBOW (cosine)"
 
     @staticmethod
     def wordnet(for_association_type: WordnetAssociation):
@@ -143,6 +148,42 @@ def add_wordnet_predictor(df: DataFrame,
 
     # noinspection PyTypeChecker
     df[PredictorName.wordnet(association_type)] = df.apply(calc_wordnet_distance, axis=1)
+
+    return df
+
+
+def add_mandera_predictor(df: DataFrame, word_key_cols: Tuple[str, str]):
+    """
+    Adds a column of Mandera's recommended CBOW cosine distances to the supplied dataframe
+
+    :param df:
+        The reference DataFrame
+    :param word_key_cols:
+        2-tuple of strings: the column names for the first and second words in a pair for which feature overlap will be
+        calculated.
+    :return:
+        `df` plus an appropriately named feature overlap column.
+    """
+
+    assert len(word_key_cols) == 2
+    key_col_1, key_col_2 = word_key_cols
+
+    # For capture by next closure
+    i = 0
+    n = df.shape[0]
+
+    def calc_mandera_distance(row):
+        nonlocal i
+        i += 1
+        print_progress(i, n, prefix=f"Mandera CBOW cosine")
+
+        # Get words
+        w1 = row[key_col_1]
+        w2 = row[key_col_2]
+
+        return MANDERA_CBOW.distance_between(w1, w2, distance_type=DistanceType.cosine)
+
+    df[PredictorName.mandera_cbow()] = df.apply(calc_mandera_distance, axis=1)
 
     return df
 

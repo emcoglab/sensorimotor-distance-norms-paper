@@ -9,3 +9,6 @@ data/buchanan/*
 
 !data/concreteness
 data/concreteness/*
+
+!data/Mandera
+data/Mandera/*
