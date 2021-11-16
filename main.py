@@ -15,7 +15,7 @@ from predictors.predictors import add_wordnet_predictor, add_lsa_predictor, add_
     add_sensorimotor_predictor, PredictorName
 from predictors.wordnet import WordnetAssociation
 from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
-from visualisation.distributions import graph_distance_distribution
+from visualisation.distributions import graph_sensorimotor_distance_distribution
 
 
 def common_similarity_modelling(df: DataFrame,
@@ -272,13 +272,13 @@ if __name__ == '__main__':
     figures_location = Path(save_dir, "Figures")
     n_bins = 20
     ylim = None
-    graph_distance_distribution(
+    graph_sensorimotor_distance_distribution(
         distance_type=DistanceType.cosine, n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
-    graph_distance_distribution(
+    graph_sensorimotor_distance_distribution(
         distance_type=DistanceType.correlation, n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
-    graph_distance_distribution(
+    graph_sensorimotor_distance_distribution(
         distance_type=DistanceType.Minkowski3, n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
-    graph_distance_distribution(
+    graph_sensorimotor_distance_distribution(
         distance_type=DistanceType.Euclidean, n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
 
     # Run each of the analyses in turn
