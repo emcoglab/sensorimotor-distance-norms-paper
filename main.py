@@ -198,7 +198,7 @@ def save_full_pairwise_distances(location: Path, overwrite: bool):
 
     with temporary_csv_path.open("w") as temp_file:
         # Write the header
-        temp_file.write(f"{WORD_1},{WORD_2},{DISTANCE}")
+        temp_file.write(f"{WORD_1},{WORD_2},{DISTANCE}\n")
         for word_i, word in enumerate(all_words):
 
             # Only the LTV, don't double-count (diagonal is fine)
