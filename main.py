@@ -210,12 +210,15 @@ def save_full_pairwise_distances(location: Path, overwrite: bool):
                 sensorimotor_norms.matrix_for_words(other_words),
                 'cosine').reshape(-1)
 
+            # Ensure diagonal is exactly 0 (even if cdist would have produced rounding errors)
+            distances[0] = 0
+
             these_distances = DataFrame()
             these_distances[WORD_2] = other_words
             these_distances[DISTANCE] = distances
             these_distances[WORD_1] = word
 
-            # Append this block of distances
+            # Append this block of distances to the file
             these_distances[[WORD_1, WORD_2, DISTANCE]].to_csv(temp_file, header=False, index=False)
 
             print_progress(word_i, len(all_words))
