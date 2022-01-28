@@ -12,7 +12,7 @@ from linguistic_distributional_models.utils.logging import print_progress
 from linguistic_distributional_models.utils.maths import DistanceType
 from predictors.aux import logger, logger_format, logger_dateformat, pos_dir, lsa_dir
 from predictors.predictors import add_wordnet_predictor, add_lsa_predictor, add_feature_overlap_predictor, \
-    add_sensorimotor_predictor, PredictorName
+    add_sensorimotor_predictor, add_mandera_predictor, PredictorName
 from predictors.wordnet import WordnetAssociation
 from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
 from visualisation.distributions import graph_sensorimotor_distance_distribution
@@ -49,6 +49,9 @@ def common_similarity_modelling(df: DataFrame,
         df,
         word_key_cols=word_key_cols,
         lsa_path=lsa_path)
+    df = add_mandera_predictor(
+        df,
+        word_key_cols=word_key_cols)
     df = add_feature_overlap_predictor(
         df,
         word_key_cols=word_key_cols)
@@ -71,6 +74,7 @@ def common_similarity_modelling(df: DataFrame,
     df["Common to all predictors"] = (
         ~isna(df[PredictorName.wordnet(WordnetAssociation.JiangConrath)])
         & ~isna(df[PredictorName.lsa()])
+        & ~isna(df[PredictorName.mandera_cbow()])
         & ~isna(df[PredictorName.feature_overlap()])
         & ~isna(df[PredictorName.sensorimotor_distance(DistanceType.cosine)])  # Identical for all DistanceTypes
     )
