@@ -277,7 +277,7 @@ if __name__ == '__main__':
 
     # Graph distributions for each measure
     figures_location = Path(save_dir, "Figures")
-    n_bins = 20
+    n_bins = 50
     ylim = None
     graph_sensorimotor_distance_distribution(
         distance_type=DistanceType.cosine, n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
