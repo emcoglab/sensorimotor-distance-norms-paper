@@ -21,7 +21,7 @@ ds = zeros((n_draws, ))
 es = zeros((n_draws, ))
 for i in range(n_draws):
     w1, w2 = w1s[i], w2s[i]
-    v1, v2 = sn.vector_for_word(w1), sn.vector_for_word(w2)
+    v1, v2 = sn.sensorimotor_vector_for_word(w1), sn.sensorimotor_vector_for_word(w2)
     e1, e2 = sn.stat_for_word(w1, DataColNames.exclusivity_sensorimotor), sn.stat_for_word(w2, DataColNames.exclusivity_sensorimotor)
 
     # For the pair

@@ -39,6 +39,14 @@ class PredictorName:
     def sensorimotor_distance(for_distance_type: DistanceType):
         return f"Sensorimotor distance ({for_distance_type.name})"
 
+    @staticmethod
+    def sensory_distance(for_distance_type: DistanceType):
+        return f"Perceptual distance ({for_distance_type.name})"
+
+    @staticmethod
+    def motor_distance(for_distance_type: DistanceType):
+        return f"Action distance ({for_distance_type.name})"
+
 
 def add_lsa_predictor(df: DataFrame, word_key_cols: Tuple[str, str], lsa_path: Path) -> DataFrame:
     """
@@ -223,7 +231,7 @@ def add_feature_overlap_predictor(df: DataFrame, word_key_cols: Tuple[str, str])
     return df
 
 
-def add_sensorimotor_predictor(df: DataFrame, word_key_cols: Tuple[str, str], distance_type: DistanceType):
+def add_sensorimotor_predictor(df: DataFrame, word_key_cols: Tuple[str, str], distance_type: DistanceType, only: Optional[str] = None):
     """
     Adds a column of sensorimotor disatnces to the specified dataframe.
 
@@ -239,7 +247,16 @@ def add_sensorimotor_predictor(df: DataFrame, word_key_cols: Tuple[str, str], di
         If a column of the same name already existed, nothing will be added.
     """
 
-    if PredictorName.sensorimotor_distance(distance_type) in df.columns:
+    if only is None:
+        predictor_name = PredictorName.sensorimotor_distance(distance_type)
+    elif only == "sensory":
+        predictor_name = PredictorName.sensory_distance(distance_type)
+    elif only == "motor":
+        predictor_name = PredictorName.motor_distance(distance_type)
+    else:
+        raise ValueError()
+
+    if predictor_name in df.columns:
         logger.info("Predictor already exists, skipping")
         return
 
@@ -253,15 +270,35 @@ def add_sensorimotor_predictor(df: DataFrame, word_key_cols: Tuple[str, str], di
     def calc_sensorimotor_distance(row):
         nonlocal i
         i += 1
-        print_progress(i, n, prefix=f"Sensorimotor {distance_type.name}: ")
+        if only is None:
+            prfx = "Sensorimotor"
+            sensory_only = motor_only = None
+        elif only == "sensory":
+            prfx = "Sensory"
+            sensory_only = True
+            motor_only = False
+        elif only == "motor":
+            prfx = "Motor"
+            sensory_only = False
+            motor_only = True
+        else:
+            raise ValueError()
+        print_progress(i, n, prefix=f"{prfx} {distance_type.name}: ")
         try:
-            v1 = _sensorimotor_norms.vector_for_word(row[key_col_1].lower())
-            v2 = _sensorimotor_norms.vector_for_word(row[key_col_2].lower())
-            return distance(v1, v2, distance_type=distance_type)
+            if sensory_only:
+                v1 = _sensorimotor_norms.sensory_vector_for_word(row[key_col_1].lower())
+                v2 = _sensorimotor_norms.sensory_vector_for_word(row[key_col_2].lower())
+            elif motor_only:
+                v1 = _sensorimotor_norms.motor_vector_for_word(row[key_col_1].lower())
+                v2 = _sensorimotor_norms.motor_vector_for_word(row[key_col_2].lower())
+            else:
+                v1 = _sensorimotor_norms.sensorimotor_vector_for_word(row[key_col_1].lower())
+                v2 = _sensorimotor_norms.sensorimotor_vector_for_word(row[key_col_2].lower())
         except WordNotInNormsError:
             return None
+        return distance(v1, v2, distance_type=distance_type)
 
     # noinspection PyTypeChecker
-    df[PredictorName.sensorimotor_distance(distance_type)] = df.apply(calc_sensorimotor_distance, axis=1)
+    df[predictor_name] = df.apply(calc_sensorimotor_distance, axis=1)
 
     return df

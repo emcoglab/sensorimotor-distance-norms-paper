@@ -4,18 +4,14 @@ from random import seed
 from typing import Tuple, Iterable
 
 from pandas import DataFrame, concat, read_csv, isna
-from scipy.spatial.distance import cdist
 
 from linguistic_distributional_models.evaluation.association import WordsimAll, WordAssociationTest, SimlexSimilarity, \
     MenSimilarity
-from linguistic_distributional_models.utils.logging import print_progress
 from linguistic_distributional_models.utils.maths import DistanceType
 from predictors.aux import logger, logger_format, logger_dateformat, pos_dir, lsa_dir
 from predictors.predictors import add_wordnet_predictor, add_lsa_predictor, add_feature_overlap_predictor, \
     add_sensorimotor_predictor, add_mandera_predictor, PredictorName
 from predictors.wordnet import WordnetAssociation
-from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
-from visualisation.distributions import graph_sensorimotor_distance_distribution
 
 
 def common_similarity_modelling(df: DataFrame,
@@ -58,25 +54,18 @@ def common_similarity_modelling(df: DataFrame,
     df = add_sensorimotor_predictor(
         df,
         word_key_cols=word_key_cols,
-        distance_type=DistanceType.cosine)
+        distance_type=DistanceType.cosine, only="sensory")
     df = add_sensorimotor_predictor(
         df,
         word_key_cols=word_key_cols,
-        distance_type=DistanceType.correlation)
-    df = add_sensorimotor_predictor(
-        df,
-        word_key_cols=word_key_cols,
-        distance_type=DistanceType.Euclidean)
-    df = add_sensorimotor_predictor(
-        df,
-        word_key_cols=word_key_cols,
-        distance_type=DistanceType.Minkowski3)
+        distance_type=DistanceType.cosine, only="motor")
     df["Common to all predictors"] = (
         ~isna(df[PredictorName.wordnet(WordnetAssociation.JiangConrath)])
         & ~isna(df[PredictorName.lsa()])
         & ~isna(df[PredictorName.mandera_cbow()])
         & ~isna(df[PredictorName.feature_overlap()])
-        & ~isna(df[PredictorName.sensorimotor_distance(DistanceType.cosine)])  # Identical for all DistanceTypes
+        & ~isna(df[PredictorName.sensory_distance(DistanceType.cosine)])
+        & ~isna(df[PredictorName.motor_distance(DistanceType.cosine)])
     )
 
     logger.info(f"Saving results to {save_path}")
@@ -182,56 +171,6 @@ def save_combined_pairs(dfs: Iterable[DataFrame], location: Path) -> None:
         combined_data.to_csv(f, header=True, index=False)
 
 
-def save_full_pairwise_distances(location: Path, overwrite: bool):
-    WORD_1 = "Word 1"
-    WORD_2 = "Word 2"
-    DISTANCE = "Distance"
-
-    sensorimotor_norms = SensorimotorNorms()
-
-    logger.info("Computing all distance pairs")
-
-    final_filename = "all_distances.csv"
-    if Path(location, final_filename).exists() and not overwrite:
-        logger.info(f"File {final_filename} exists, skipping.")
-        return
-
-    temporary_csv_path = Path(location, f"{final_filename}.incomplete")
-
-    all_words = sorted(sensorimotor_norms.iter_words())
-
-    with temporary_csv_path.open("w") as temp_file:
-        # Write the header
-        temp_file.write(f"{WORD_1},{WORD_2},{DISTANCE}\n")
-        for word_i, word in enumerate(all_words):
-
-            # Only the LTV, don't double-count (diagonal is fine)
-            other_words = all_words[word_i:]
-
-            # Pairwise distances for this word and all other (not yet seen, i.e. ltv-only) words
-            distances = cdist(
-                sensorimotor_norms.sensorimotor_vector_for_word(word).reshape(1, -1),
-                sensorimotor_norms.matrix_for_words(other_words),
-                'cosine').reshape(-1)
-
-            # Ensure diagonal is exactly 0 (even if cdist would have produced rounding errors)
-            distances[0] = 0
-
-            these_distances = DataFrame()
-            these_distances[WORD_2] = other_words
-            these_distances[DISTANCE] = distances
-            these_distances[WORD_1] = word
-
-            # Append this block of distances to the file
-            these_distances[[WORD_1, WORD_2, DISTANCE]].to_csv(temp_file, header=False, index=False)
-
-            print_progress(word_i, len(all_words))
-    print_progress(len(all_words), len(all_words))
-
-    # Move into place
-    temporary_csv_path.rename(Path(location, final_filename))
-
-
 def label_with_concreteness(df: DataFrame) -> DataFrame:
 
     concreteness_df = read_csv(
@@ -272,21 +211,8 @@ if __name__ == '__main__':
     seed(1)
 
     # TODO: make these CLI args
-    save_dir = Path("/Users/caiwingfield/Box Sync/LANGBOOT Project/Manuscripts/Draft - Sensorimotor distance norms/Output/")
+    save_dir = Path("/Users/caiwingfield/Desktop/response_subspaces/")
     overwrite = True
-
-    # Graph distributions for each measure
-    figures_location = Path(save_dir, "Figures")
-    n_bins = 50
-    ylim = None
-    graph_sensorimotor_distance_distribution(
-        distance_type=DistanceType.cosine, n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
-    graph_sensorimotor_distance_distribution(
-        distance_type=DistanceType.correlation, n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
-    graph_sensorimotor_distance_distribution(
-        distance_type=DistanceType.Minkowski3, n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
-    graph_sensorimotor_distance_distribution(
-        distance_type=DistanceType.Euclidean, n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
 
     # Run each of the analyses in turn
     wordsim_data = model_wordsim(location=save_dir, overwrite=overwrite)
@@ -294,8 +220,5 @@ if __name__ == '__main__':
     men_data     = model_men(location=save_dir, overwrite=overwrite)
 
     save_combined_pairs((wordsim_data, simlex_data, men_data), location=save_dir)
-
-    # This makes a 30GB file so don't run it unless you really want to
-    # save_full_pairwise_distances(location=save_dir, overwrite=overwrite)
 
     logger.info("Done!")

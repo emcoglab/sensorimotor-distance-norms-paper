@@ -48,7 +48,7 @@ def bin_distances(bins, distance_type) -> Tuple[array, float, float, float, floa
         if i % 1_000 == 0:
             logger.info(f"Done {i:,} words")
 
-        word_vector = array(sn.vector_for_word(word))
+        word_vector = array(sn.sensorimotor_vector_for_word(word))
         all_data = array(sn.matrix_for_words(all_words))
 
         if distance_type == DistanceType.Minkowski3:
