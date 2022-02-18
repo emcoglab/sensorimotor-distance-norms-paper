@@ -1,3 +1,21 @@
+"""
+===========================
+Find closest and furthest pairs in the whole set of norms.
+===========================
+
+Dr. Cai Wingfield
+---------------------------
+Embodied Cognition Lab
+Department of Psychology
+University of Lancaster
+c.wingfield@lancaster.ac.uk
+caiwingfield.net
+---------------------------
+2022
+---------------------------
+"""
+
+
 from pathlib import Path
 
 from numpy import inf
