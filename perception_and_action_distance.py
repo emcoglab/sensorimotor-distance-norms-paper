@@ -229,7 +229,7 @@ if __name__ == '__main__':
     seed(1)
 
     # TODO: make these CLI args
-    save_dir = Path("/Users/caiwingfield/Desktop/response_subspaces/")
+    save_dir = Path("/Users/caiwingfield/Box Sync/LANGBOOT Project/Manuscripts/Draft - Sensorimotor distance norms/Output/response_subspaces/")
     overwrite = True
 
     # Run each of the analyses in turn
