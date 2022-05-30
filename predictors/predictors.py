@@ -5,10 +5,10 @@ from typing import Tuple, Dict, Optional
 from pandas import DataFrame, read_csv, merge, concat
 
 from linguistic_distributional_models.utils.logging import print_progress
-from linguistic_distributional_models.utils.maths import distance, DistanceType
 from sensorimotor_norms.exceptions import WordNotInNormsError
 from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
 from .aux import logger
+from .distance import Distance, Cosine
 from .mandera import MANDERA_CBOW
 from .wordnet import elex_to_wordnet
 from .buchanan import BUCHANAN_FEATURE_NORMS
@@ -36,16 +36,16 @@ class PredictorName:
         return "Buchanan root cosine overlap"
 
     @staticmethod
-    def sensorimotor_distance(for_distance_type: DistanceType):
-        return f"Sensorimotor distance ({for_distance_type.name})"
+    def sensorimotor_distance(for_distance: Distance):
+        return f"Sensorimotor distance ({for_distance.name})"
 
     @staticmethod
-    def sensory_distance(for_distance_type: DistanceType):
-        return f"Perceptual distance ({for_distance_type.name})"
+    def sensory_distance(for_distance: Distance):
+        return f"Perceptual distance ({for_distance.name})"
 
     @staticmethod
-    def motor_distance(for_distance_type: DistanceType):
-        return f"Action distance ({for_distance_type.name})"
+    def motor_distance(for_distance: Distance):
+        return f"Action distance ({for_distance.name})"
 
 
 def add_lsa_predictor(df: DataFrame, word_key_cols: Tuple[str, str], lsa_path: Path) -> DataFrame:
@@ -189,7 +189,7 @@ def add_mandera_predictor(df: DataFrame, word_key_cols: Tuple[str, str]):
         w1 = row[key_col_1]
         w2 = row[key_col_2]
 
-        return MANDERA_CBOW.distance_between(w1, w2, distance_type=DistanceType.cosine)
+        return MANDERA_CBOW.distance_between(w1, w2, distance=Cosine())
 
     df[PredictorName.mandera_cbow()] = df.apply(calc_mandera_distance, axis=1)
 
@@ -231,7 +231,7 @@ def add_feature_overlap_predictor(df: DataFrame, word_key_cols: Tuple[str, str])
     return df
 
 
-def add_sensorimotor_predictor(df: DataFrame, word_key_cols: Tuple[str, str], distance_type: DistanceType, only: Optional[str] = None):
+def add_sensorimotor_predictor(df: DataFrame, word_key_cols: Tuple[str, str], distance: Distance, only: Optional[str] = None):
     """
     Adds a column of sensorimotor disatnces to the specified dataframe.
 
@@ -240,19 +240,19 @@ def add_sensorimotor_predictor(df: DataFrame, word_key_cols: Tuple[str, str], di
     :param word_key_cols:
         2-tuple of strings: the column names for the first and second words in a pair for which sensorimotor distances
         will be calculated.
-    :param distance_type:
-        The `DistanceType` to use when computing sensorimotor distances.
+    :param distance:
+        The `Distance` to use when computing sensorimotor distances.
     :return:
         `df` plus an appropriately named sensorimotor distance column added.
         If a column of the same name already existed, nothing will be added.
     """
 
     if only is None:
-        predictor_name = PredictorName.sensorimotor_distance(distance_type)
+        predictor_name = PredictorName.sensorimotor_distance(distance)
     elif only == "sensory":
-        predictor_name = PredictorName.sensory_distance(distance_type)
+        predictor_name = PredictorName.sensory_distance(distance)
     elif only == "motor":
-        predictor_name = PredictorName.motor_distance(distance_type)
+        predictor_name = PredictorName.motor_distance(distance)
     else:
         raise ValueError()
 
@@ -283,7 +283,7 @@ def add_sensorimotor_predictor(df: DataFrame, word_key_cols: Tuple[str, str], di
             motor_only = True
         else:
             raise ValueError()
-        print_progress(i, n, prefix=f"{prfx} {distance_type.name}: ")
+        print_progress(i, n, prefix=f"{prfx} {distance.name}: ")
         try:
             if sensory_only:
                 v1 = _sensorimotor_norms.sensory_vector_for_word(row[key_col_1].lower())
@@ -296,7 +296,7 @@ def add_sensorimotor_predictor(df: DataFrame, word_key_cols: Tuple[str, str], di
                 v2 = _sensorimotor_norms.sensorimotor_vector_for_word(row[key_col_2].lower())
         except WordNotInNormsError:
             return None
-        return distance(v1, v2, distance_type=distance_type)
+        return distance.distance(v1, v2)
 
     # noinspection PyTypeChecker
     df[predictor_name] = df.apply(calc_sensorimotor_distance, axis=1)

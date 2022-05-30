@@ -2,8 +2,8 @@ from pathlib import Path
 
 from pandas import DataFrame, read_csv
 
-from linguistic_distributional_models.utils.maths import DistanceType, distance
 from predictors.aux import mandera_dir
+from predictors.distance import Distance
 
 
 class ManderaCBOW:
@@ -19,12 +19,12 @@ class ManderaCBOW:
                 index_col=0,  # Words
             )
 
-    def distance_between(self, w1: str, w2: str, distance_type: DistanceType):
+    def distance_between(self, w1: str, w2: str, distance: Distance):
         if w1 not in self.data.index:
             return None
         if w2 not in self.data.index:
             return None
-        return distance(self.data.loc[w1], self.data.loc[w2], distance_type=distance_type)
+        return distance.distance(self.data.loc[w1], self.data.loc[w2])
 
 
 # shared copy
