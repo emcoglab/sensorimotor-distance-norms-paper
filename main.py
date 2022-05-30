@@ -9,8 +9,8 @@ from scipy.spatial.distance import cdist
 from linguistic_distributional_models.evaluation.association import WordsimAll, WordAssociationTest, SimlexSimilarity, \
     MenSimilarity
 from linguistic_distributional_models.utils.logging import print_progress
-from linguistic_distributional_models.utils.maths import DistanceType
 from predictors.aux import logger, logger_format, logger_dateformat, pos_dir, lsa_dir
+from predictors.distance import Cosine, Correlation, Euclidean, Minkowski3
 from predictors.predictors import add_wordnet_predictor, add_lsa_predictor, add_feature_overlap_predictor, \
     add_sensorimotor_predictor, add_mandera_predictor, PredictorName
 from predictors.wordnet import WordnetAssociation
@@ -58,25 +58,25 @@ def common_similarity_modelling(df: DataFrame,
     df = add_sensorimotor_predictor(
         df,
         word_key_cols=word_key_cols,
-        distance_type=DistanceType.cosine)
+        distance=Cosine())
     df = add_sensorimotor_predictor(
         df,
         word_key_cols=word_key_cols,
-        distance_type=DistanceType.correlation)
+        distance=Correlation())
     df = add_sensorimotor_predictor(
         df,
         word_key_cols=word_key_cols,
-        distance_type=DistanceType.Euclidean)
+        distance=Euclidean())
     df = add_sensorimotor_predictor(
         df,
         word_key_cols=word_key_cols,
-        distance_type=DistanceType.Minkowski3)
+        distance=Minkowski3())
     df["Common to all predictors"] = (
         ~isna(df[PredictorName.wordnet(WordnetAssociation.JiangConrath)])
         & ~isna(df[PredictorName.lsa()])
         & ~isna(df[PredictorName.mandera_cbow()])
         & ~isna(df[PredictorName.feature_overlap()])
-        & ~isna(df[PredictorName.sensorimotor_distance(DistanceType.cosine)])  # Identical for all DistanceTypes
+        & ~isna(df[PredictorName.sensorimotor_distance(Cosine())])  # Identical for all DistanceTypes
     )
 
     logger.info(f"Saving results to {save_path}")
@@ -280,13 +280,13 @@ if __name__ == '__main__':
     n_bins = 50
     ylim = None
     graph_sensorimotor_distance_distribution(
-        distance_type=DistanceType.cosine, n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
+        distance=Cosine(), n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
     graph_sensorimotor_distance_distribution(
-        distance_type=DistanceType.correlation, n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
+        distance=Correlation(), n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
     graph_sensorimotor_distance_distribution(
-        distance_type=DistanceType.Minkowski3, n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
+        distance=Minkowski3(), n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
     graph_sensorimotor_distance_distribution(
-        distance_type=DistanceType.Euclidean, n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
+        distance=Euclidean(), n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
 
     # Run each of the analyses in turn
     wordsim_data = model_wordsim(location=save_dir, overwrite=overwrite)

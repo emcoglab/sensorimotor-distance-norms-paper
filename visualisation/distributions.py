@@ -8,19 +8,19 @@ from scipy.spatial import distance_matrix as minkowski_distance_matrix
 from scipy.spatial.distance import cdist as distance_matrix
 from matplotlib import pyplot
 
-from linguistic_distributional_models.utils.maths import DistanceType, distance
 from predictors.aux import logger
+from predictors.distance import Distance, Minkowski3, Mahalanobis, Cosine, Correlation
 from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms
 
 sn = SensorimotorNorms()
 
 
-def bin_distances(bins, distance_type) -> Tuple[array, float, float, float, float]:
+def bin_distances(bins, distance: Distance) -> Tuple[array, float, float, float, float]:
     """
     Get all pairwise distances from the model and graph a histogram distribution using the specified bins.
 
     :param bins: array of bin inclusive lower-bounds plus the inclusive upper bound of the last bin (e.g. from linspace)
-    :param distance_type:
+    :param distance:
     :return: tuple:
         binned distances (array of counts of distances for each bin),
         min attained distance
@@ -51,10 +51,10 @@ def bin_distances(bins, distance_type) -> Tuple[array, float, float, float, floa
         word_vector = array(sn.sensorimotor_vector_for_word(word))
         all_data = array(sn.matrix_for_words(all_words))
 
-        if distance_type == DistanceType.Minkowski3:
+        if isinstance(distance, Minkowski3):
             distances_this_word: array = minkowski_distance_matrix(word_vector.reshape(1, 11), all_data, 3).flatten()
         else:
-            distances_this_word: array = distance_matrix(word_vector.reshape(1, 11), all_data, metric=distance_type.name).flatten()
+            distances_this_word: array = distance_matrix(word_vector.reshape(1, 11), all_data, metric=distance.name).flatten()
 
         binned_distances_this_word, _ = histogram(distances_this_word, bins)
         binned_distances += binned_distances_this_word
@@ -118,12 +118,12 @@ def style_histplot(ax: Axes, xlim: Tuple[float, float], ylim: Optional[Tuple[flo
         ax.set_ylim(ylim)
 
 
-def graph_sensorimotor_distance_distribution(distance_type: DistanceType, n_bins: int, location: Path, overwrite: bool,
+def graph_sensorimotor_distance_distribution(distance: Distance, n_bins: int, location: Path, overwrite: bool,
                                              ylim: Optional[Tuple[float, float]]):
     """
     Graph the distribution of sensorimotor distances among all pairs of concepts in the norms.
 
-    :param distance_type:
+    :param distance:
     :param n_bins:
     :param ylim:
     :param location:
@@ -131,19 +131,19 @@ def graph_sensorimotor_distance_distribution(distance_type: DistanceType, n_bins
     :return:
     """
 
-    figure_save_path = Path(location, f"distance distribution {distance_type.name} {n_bins} bins.svg")
-    distribution_save_path = Path(location, f"distance distribution {distance_type.name} {n_bins} bins.txt")
-    descriptive_stats_path = Path(location, f"distance {distance_type.name} descriptive.yaml")
+    figure_save_path = Path(location, f"distance distribution {distance.name} {n_bins} bins.svg")
+    distribution_save_path = Path(location, f"distance distribution {distance.name} {n_bins} bins.txt")
+    descriptive_stats_path = Path(location, f"distance {distance.name} descriptive.yaml")
 
     min_distance = 0
-    if distance_type == distance_type.cosine:
+    if isinstance(distance, Cosine):
         # It's 1 not 2 because all values are positive so the furthest apart we can get is tau/4
         max_distance = 1.0
-    elif distance_type == distance_type.correlation:
+    elif isinstance(distance, Correlation):
         # We can in theory get pairs of anticorrelated vectors, e.g. linspace(0, 5, 11) and linspace(5, 0, 11)
         max_distance = 2.0
     else:
-        max_distance = distance(repeat(sn.rating_min, 11), repeat(sn.rating_max, 11), distance_type=distance_type)
+        max_distance = distance.distance(repeat(sn.rating_min, 11), repeat(sn.rating_max, 11))
 
     # [:-1] determine the inclusive lower-bounds of each bin.
     # [-1] determines the inclusive upper bound of the last bin
@@ -163,7 +163,7 @@ def graph_sensorimotor_distance_distribution(distance_type: DistanceType, n_bins
         mean_distance         = descriptive_stats["Mean distance"]
         sd_distance           = descriptive_stats["SD distance"]
     else:
-        binned_distances, min_attained_distance, max_attained_distance, mean_distance, sd_distance = bin_distances(bins, distance_type)
+        binned_distances, min_attained_distance, max_attained_distance, mean_distance, sd_distance = bin_distances(bins, distance)
         with distribution_save_path.open("w") as distribution_file:
             savetxt(distribution_file, binned_distances)
         with descriptive_stats_path.open("w") as descriptive_file:
@@ -174,9 +174,9 @@ def graph_sensorimotor_distance_distribution(distance_type: DistanceType, n_bins
                 "SD distance":               float(sd_distance),
             }, descriptive_file, yaml.SafeDumper)
 
-    logger.info(f"Max theoretical pairwise {distance_type.name} distance between concepts: {max_distance}")
-    logger.info(f"Attained {distance_type.name} distance range: [{min_attained_distance}, {max_attained_distance}]")
-    logger.info(f"Mean (SD) {distance_type.name} distance: {mean_distance} ({sd_distance})")
+    logger.info(f"Max theoretical pairwise {distance.name} distance between concepts: {max_distance}")
+    logger.info(f"Attained {distance.name} distance range: [{min_attained_distance}, {max_attained_distance}]")
+    logger.info(f"Mean (SD) {distance.name} distance: {mean_distance} ({sd_distance})")
 
     fig, ax = pyplot.subplots(tight_layout=True)
     ax.hist(

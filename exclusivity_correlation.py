@@ -19,13 +19,13 @@ from numpy import corrcoef, zeros
 from numpy.random import default_rng, seed
 
 from linguistic_distributional_models.utils.logging import print_progress
-from linguistic_distributional_models.utils.maths import DistanceType, distance
+from predictors.distance import Distance, Cosine
 from sensorimotor_norms.sensorimotor_norms import SensorimotorNorms, DataColNames
 
 sn = SensorimotorNorms(use_breng_translation=False, verbose=True)
 
 
-def exclusivity_correlation(n_draws: int):
+def exclusivity_correlation(n_draws: int, distance: Distance):
     rng = default_rng()
 
     all_words = list(sn.iter_words())
@@ -41,7 +41,7 @@ def exclusivity_correlation(n_draws: int):
         e1, e2 = sn.stat_for_word(w1, DataColNames.exclusivity_sensorimotor), sn.stat_for_word(w2, DataColNames.exclusivity_sensorimotor)
 
         # For the pair
-        distances[i] = distance(v1, v2, DistanceType.cosine)  # vector distance
+        distances[i] = distance.distance(v1, v2)  # vector distance
         mean_exclusivities[i] = (e1 + e2) / 2  # mean exclusivity
 
         print_progress(i + 1, n_draws)
@@ -51,5 +51,5 @@ def exclusivity_correlation(n_draws: int):
 
 if __name__ == "__main__":
     seed(451)
-    correlation = exclusivity_correlation(n_draws=10_000)
+    correlation = exclusivity_correlation(n_draws=10_000, distance=Cosine())
     print(correlation)

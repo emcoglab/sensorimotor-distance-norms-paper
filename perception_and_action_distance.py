@@ -25,8 +25,8 @@ from pandas import DataFrame, concat, read_csv, isna
 
 from linguistic_distributional_models.evaluation.association import WordsimAll, WordAssociationTest, SimlexSimilarity, \
     MenSimilarity
-from linguistic_distributional_models.utils.maths import DistanceType
 from predictors.aux import logger, logger_format, logger_dateformat, pos_dir, lsa_dir
+from predictors.distance import Cosine
 from predictors.predictors import add_wordnet_predictor, add_lsa_predictor, add_feature_overlap_predictor, \
     add_sensorimotor_predictor, add_mandera_predictor, PredictorName
 from predictors.wordnet import WordnetAssociation
@@ -72,18 +72,18 @@ def common_similarity_modelling(df: DataFrame,
     df = add_sensorimotor_predictor(
         df,
         word_key_cols=word_key_cols,
-        distance_type=DistanceType.cosine, only="sensory")
+        distance=Cosine(), only="sensory")
     df = add_sensorimotor_predictor(
         df,
         word_key_cols=word_key_cols,
-        distance_type=DistanceType.cosine, only="motor")
+        distance=Cosine(), only="motor")
     df["Common to all predictors"] = (
         ~isna(df[PredictorName.wordnet(WordnetAssociation.JiangConrath)])
         & ~isna(df[PredictorName.lsa()])
         & ~isna(df[PredictorName.mandera_cbow()])
         & ~isna(df[PredictorName.feature_overlap()])
-        & ~isna(df[PredictorName.sensory_distance(DistanceType.cosine)])
-        & ~isna(df[PredictorName.motor_distance(DistanceType.cosine)])
+        & ~isna(df[PredictorName.sensory_distance(Cosine())])
+        & ~isna(df[PredictorName.motor_distance(Cosine())])
     )
 
     logger.info(f"Saving results to {save_path}")
