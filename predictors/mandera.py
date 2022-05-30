@@ -11,7 +11,13 @@ class ManderaCBOW:
 
     def __init__(self):
         with self._data_path_cbow.open("r") as data_file:
-            self.data: DataFrame = read_csv(data_file, header=3, index_col=0, delim_whitespace=True)
+            self.data: DataFrame = read_csv(
+                data_file,
+                delim_whitespace=True,
+                skiprows=3,  # Initial comments and size
+                header=None,
+                index_col=0,  # Words
+            )
 
     def distance_between(self, w1: str, w2: str, distance_type: DistanceType):
         if w1 not in self.data.index:
