@@ -3,6 +3,7 @@ from pathlib import Path
 from random import seed
 from typing import Tuple, Iterable
 
+from numpy import array
 from pandas import DataFrame, concat, read_csv, isna
 from scipy.spatial.distance import cdist
 
@@ -10,7 +11,8 @@ from linguistic_distributional_models.evaluation.association import WordsimAll, 
     MenSimilarity
 from linguistic_distributional_models.utils.logging import print_progress
 from predictors.aux import logger, logger_format, logger_dateformat, pos_dir, lsa_dir
-from predictors.distance import Cosine, Correlation, Euclidean, Minkowski3
+from predictors.covariance import load_covariance_matrix, save_covariance_matrix
+from predictors.distance import Cosine, Correlation, Euclidean, Minkowski3, Mahalanobis
 from predictors.predictors import add_wordnet_predictor, add_lsa_predictor, add_feature_overlap_predictor, \
     add_sensorimotor_predictor, add_mandera_predictor, PredictorName
 from predictors.wordnet import WordnetAssociation
@@ -71,6 +73,10 @@ def common_similarity_modelling(df: DataFrame,
         df,
         word_key_cols=word_key_cols,
         distance=Minkowski3())
+    df = add_sensorimotor_predictor(
+        df,
+        word_key_cols=word_key_cols,
+        distance=Mahalanobis(with_covariance_matrix=get_covariance_matrix(save_path.parent, overwrite=overwrite)))
     df["Common to all predictors"] = (
         ~isna(df[PredictorName.wordnet(WordnetAssociation.JiangConrath)])
         & ~isna(df[PredictorName.lsa()])
@@ -265,6 +271,17 @@ def label_with_concreteness(df: DataFrame) -> DataFrame:
     return df
 
 
+def get_covariance_matrix(location, overwrite) -> array:
+    try:
+        logger.info("Loading covariance matrix...")
+        covariance_matrix = load_covariance_matrix(from_dir=location)
+    except FileNotFoundError:
+        logger.info("Loading failed, recomputing...")
+        data_matrix = SensorimotorNorms().matrix().T
+        covariance_matrix = save_covariance_matrix(data_matrix, to_dir=location, overwrite=overwrite)
+    return covariance_matrix
+
+
 if __name__ == '__main__':
     basicConfig(format=logger_format, datefmt=logger_dateformat, level=INFO)
 
@@ -274,6 +291,15 @@ if __name__ == '__main__':
     # TODO: make these CLI args
     save_dir = Path("/Users/caiwingfield/Box Sync/LANGBOOT Project/Manuscripts/Draft - Sensorimotor distance norms/Output/")
     overwrite = True
+
+    covariance_matrix = get_covariance_matrix(save_dir, overwrite)
+
+    # Run each of the analyses in turn
+    wordsim_data = model_wordsim(location=save_dir, overwrite=overwrite)
+    simlex_data  = model_simlex(location=save_dir, overwrite=overwrite)
+    men_data     = model_men(location=save_dir, overwrite=overwrite)
+
+    save_combined_pairs((wordsim_data, simlex_data, men_data), location=save_dir)
 
     # Graph distributions for each measure
     figures_location = Path(save_dir, "Figures")
@@ -287,13 +313,8 @@ if __name__ == '__main__':
         distance=Minkowski3(), n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
     graph_sensorimotor_distance_distribution(
         distance=Euclidean(), n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
-
-    # Run each of the analyses in turn
-    wordsim_data = model_wordsim(location=save_dir, overwrite=overwrite)
-    simlex_data  = model_simlex(location=save_dir, overwrite=overwrite)
-    men_data     = model_men(location=save_dir, overwrite=overwrite)
-
-    save_combined_pairs((wordsim_data, simlex_data, men_data), location=save_dir)
+    graph_sensorimotor_distance_distribution(
+        distance=Mahalanobis(with_covariance_matrix=covariance_matrix), n_bins=n_bins, location=figures_location, overwrite=overwrite, ylim=ylim)
 
     # This makes a 30GB file so don't run it unless you really want to
     # save_full_pairwise_distances(location=save_dir, overwrite=overwrite)

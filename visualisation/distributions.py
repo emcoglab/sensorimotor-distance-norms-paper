@@ -4,6 +4,7 @@ from typing import Tuple, Optional, Dict
 import yaml
 from matplotlib.axes import Axes
 from numpy import array, zeros, arange, repeat, linspace, savetxt, loadtxt, histogram, inf, nditer, sqrt
+from numpy.linalg import inv
 from scipy.spatial import distance_matrix as minkowski_distance_matrix
 from scipy.spatial.distance import cdist as distance_matrix
 from matplotlib import pyplot
@@ -53,6 +54,8 @@ def bin_distances(bins, distance: Distance) -> Tuple[array, float, float, float,
 
         if isinstance(distance, Minkowski3):
             distances_this_word: array = minkowski_distance_matrix(word_vector.reshape(1, 11), all_data, 3).flatten()
+        elif isinstance(distance, Mahalanobis):
+            distances_this_word: array = distance_matrix(word_vector.reshape(1, 11), all_data, metric=distance.name, VI=inv(distance.covariance_matrix)).flatten()
         else:
             distances_this_word: array = distance_matrix(word_vector.reshape(1, 11), all_data, metric=distance.name).flatten()
 
