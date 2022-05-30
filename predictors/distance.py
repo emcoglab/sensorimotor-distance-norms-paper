@@ -6,10 +6,9 @@ from scipy.spatial.distance import minkowski, cosine as cosine_distance
 
 
 class Distance(ABC):
-    @classmethod
     @property
     @abstractmethod
-    def name(cls) -> str:
+    def name(self) -> str:
         raise NotImplementedError()
 
     @abstractmethod
@@ -18,36 +17,32 @@ class Distance(ABC):
 
 
 class Euclidean(Distance):
-    @classmethod
     @property
-    def name(cls): return "Euclidean"
+    def name(self): return "Euclidean"
 
     def distance(self, u: array, v: array) -> float:
         return norm(u - v)
 
 
 class Cosine(Distance):
-    @classmethod
     @property
-    def name(cls): return "cosine"
+    def name(self): return "cosine"
 
     def distance(self, u: array, v: array) -> float:
         return cosine_distance(u, v)
 
 
 class Correlation(Distance):
-    @classmethod
     @property
-    def name(cls): return "correlation"
+    def name(self): return "correlation"
 
     def distance(self, u: array, v: array) -> float:
         return 1 - corrcoef(u, v)[0, 1]
 
 
 class Minkowski3(Distance):
-    @classmethod
     @property
-    def name(cls): return "Minkowski-3"
+    def name(self): return "Minkowski-3"
 
     def distance(self, u: array, v: array) -> float:
         return minkowski(u, v, p=3)
